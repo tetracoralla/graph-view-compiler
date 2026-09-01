@@ -119,6 +119,19 @@ describe("ports and routing", () => {
     expect(new Set(positions).size).toBe(3);
   });
 
+  it("uses locale-independent code-point order for tied port requests", () => {
+    const nodes = [
+      left,
+      { id: "target-z", x: 400, y: 100, width: 120, height: 54 },
+      { id: "target-umlaut", x: 400, y: 100, width: 120, height: 54 },
+    ];
+    const ports = allocateRectanglePorts(nodes, [
+      { id: "z", source: "left", target: "target-z" },
+      { id: "ä", source: "left", target: "target-umlaut" },
+    ]);
+    expect(ports.get("z:source")!.y).toBeLessThan(ports.get("ä:source")!.y);
+  });
+
   it("assigns one bridge owner at an unrelated crossing", () => {
     const top: NodeBox = { id: "top", x: 202, y: -120, width: 196, height: 54 };
     const bottom: NodeBox = { id: "bottom", x: 202, y: 300, width: 196, height: 54 };
