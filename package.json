@@ -1,0 +1,59 @@
+{
+  "name": "@openadam/graph-projection",
+  "version": "0.1.0",
+  "description": "Deterministic layered layout, ports, orthogonal routing, and endpoint semantics for typed graphs.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "openAdam",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tetracoralla/graph-projection.git"
+  },
+  "homepage": "https://github.com/tetracoralla/graph-projection#readme",
+  "bugs": {
+    "url": "https://github.com/tetracoralla/graph-projection/issues"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs/ENGINE_SELECTION.md",
+    "docs/PRODUCT_MODEL.md",
+    "README.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "NOTICE",
+    "SECURITY.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "check:release": "node scripts/check-release.mjs",
+    "check:packed-install": "node scripts/check-packed-install.mjs",
+    "sync:consumers": "node scripts/sync-consumers.mjs",
+    "prepack": "npm run build",
+    "check": "npm run typecheck && npm test && npm run build && npm run check:release && npm run check:packed-install"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "3.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
