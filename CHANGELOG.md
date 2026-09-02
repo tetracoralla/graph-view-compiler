@@ -15,6 +15,14 @@
 - Bound routing options, quadratic geometric inspection, and returned
   diagnostics; partial inspection is reported rather than presented as complete.
 - Reject undeclared pass, layout, and routing fields at the compiler boundary.
+- Validate projection versions, identifiers, directions, ports, and finite
+  relation weights before low-level layout or routing work begins.
+- Distinguish ordinary direct routes from obstacle-limit and no-corridor
+  fallbacks so diagnostics report actual degradation rather than simple graphs.
+- Keep opaque graph identifiers such as `__proto__` and `constructor` safe in
+  collapse provenance and route-crossing results.
+- Publish the package as Graph View Compiler under
+  `@openadam/graph-view-compiler` with Apache-2.0 release assets.
 
 ## 0.2.0 - 2026-09-02
 

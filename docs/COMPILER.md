@@ -12,7 +12,7 @@ needed:
 import {
   compileGraphView,
   type SemanticGraphV1,
-} from "@openadam/graph-projection/compiler";
+} from "@openadam/graph-view-compiler/compiler";
 ```
 
 ## Ordered compile
@@ -68,7 +68,9 @@ Routing accepts only `stub`, `clearance`, `turnCost`, and
 edge. When the selected lower budget is exceeded, the compiler uses its
 deterministic simple orthogonal fallback and returns a
 `routing_obstacle_limit` diagnostic instead of silently implying full obstacle
-inspection.
+inspection. A simple route used because an edge has no unrelated obstacles is
+normal and produces no fallback warning; `routing_fallback` is reserved for an
+edge that had obstacles but no obstacle-avoiding corridor.
 
 ## View plan
 

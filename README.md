@@ -1,6 +1,9 @@
-# Graph Projection
+# Graph View Compiler
 
-Deterministic geometry for applications that already own a typed graph.
+Compile one authoritative typed graph into deterministic, renderer-neutral
+view plans. Applications keep their own semantics, renderer, interaction, and
+visual language while sharing the brittle transformation, layout, routing,
+stability, and diagnostic boundary.
 
 The package provides three deliberately separate layers:
 
@@ -40,6 +43,38 @@ integration failures are supported, rejected, or still bounded.
 See the [performance boundary](docs/PERFORMANCE.md) for hard work limits and a
 rerunnable package, cold-import, determinism, and compile-time measurement.
 
+## Install
+
+```sh
+npm install @openadam/graph-view-compiler@0.3.0
+```
+
+## Quick start
+
+```ts
+import { compileGraphView } from "@openadam/graph-view-compiler/compiler";
+
+const plan = compileGraphView({
+  graph: {
+    version: 1,
+    nodes: [{ id: "source" }, { id: "result" }],
+    relations: [{
+      id: "compile",
+      source: "source",
+      target: "result",
+      direction: "directed",
+    }],
+  },
+  nodeSizes: {
+    source: { width: 120, height: 48 },
+    result: { width: 120, height: 48 },
+  },
+  profile: { type: "layered", layout: { direction: "left-to-right" } },
+});
+
+// Render plan.nodes and plan.edges with the product's own UI and visual system.
+```
+
 ## Develop
 
 Use Node.js 22.12 or newer.
@@ -55,29 +90,26 @@ source checkout.
 
 ## Consume
 
-After public registry publication, applications pin an exact compatible
-version:
+Applications should pin an exact compatible registry version:
 
 ```json
 {
   "dependencies": {
-      "@openadam/graph-projection": "0.3.0"
+      "@openadam/graph-view-compiler": "0.3.0"
   }
 }
 ```
 
-Before registry publication, Calligram, Laniakea, and Dependency Engine keep the exact packed
-tarball in their own `vendor/` directories so a standalone source checkout can
-run `npm ci`. After changing this package, refresh all three consumers with:
+For unreleased release-candidate validation, Calligram, Laniakea, and Dependency
+Engine can temporarily consume the exact packed tarball. Refresh all three with:
 
 ```sh
 npm run sync:consumers -- ../visual-document ../laniakea ../graph-dependency-solver
 ```
 
-The consumers verify the tarball SHA-256 and installed package version in their
-normal regression commands. The release workflow can publish a version-tagged
-package with npm provenance after the public repository and npm trusted
-publisher are deliberately configured.
+The release workflow publishes through npm trusted publishing and receives npm
+provenance automatically. Maintainer steps are documented in
+[Releasing](docs/RELEASING.md).
 
 The high-level portable graph contract accepts at most 2,000 nodes and 8,000
 edges per projection call. Products with tighter interaction or document
@@ -89,7 +121,7 @@ groups. Path results and traversal depth are separately bounded. See the
 [semantic graph contract](docs/SEMANTIC_GRAPH.md) and
 [compatibility policy](docs/COMPATIBILITY.md).
 
-Semantic-only consumers import `@openadam/graph-projection/semantic` so the
+Semantic-only consumers import `@openadam/graph-view-compiler/semantic` so the
 layered layout backend is not part of their runtime module graph.
 
 ## License

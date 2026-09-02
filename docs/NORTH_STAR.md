@@ -2,8 +2,8 @@
 
 Status: owner-confirmed product definition. The current 0.3 package implements
 the stable narrow waist described here for layered and caller-positioned 2D
-views. `Graph Projection` remains a working name until the owner approves a
-public brand.
+views. The public product identity is `Graph View Compiler`; the npm package is
+`@openadam/graph-view-compiler`.
 
 ## The job
 
@@ -163,5 +163,5 @@ without adopting a shared renderer.
 This closes the current compile boundary; it does not freeze the product. A new
 layout backend, expanded compound-group placement, or 3D projection belongs only
 after a current consumer and comparative fixture demonstrate that it serves the
-same job better without changing semantic meaning. Public brand selection and
-registry publication are separate owner decisions, not missing compiler work.
+same job better without changing semantic meaning. Registry publication remains
+a separate release decision, not missing compiler work.

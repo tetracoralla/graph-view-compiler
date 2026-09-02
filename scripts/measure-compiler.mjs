@@ -135,9 +135,9 @@ process.stdout.write(`${JSON.stringify({
     files: packageReport.files.length,
   },
   coldImports: [
-    coldImport("@openadam/graph-projection/semantic"),
-    coldImport("@openadam/graph-projection/compiler"),
-    coldImport("@openadam/graph-projection"),
+    coldImport("@openadam/graph-view-compiler/semantic"),
+    coldImport("@openadam/graph-view-compiler/compiler"),
+    coldImport("@openadam/graph-view-compiler"),
   ],
   cases,
 }, null, 2)}\n`);

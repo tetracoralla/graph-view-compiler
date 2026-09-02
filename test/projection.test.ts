@@ -193,6 +193,45 @@ describe("versioned semantic graph", () => {
     expect(collapseSemanticGroups(grouped, []).absorbedRelationIds).toEqual([]);
   });
 
+  it("treats prototype-shaped graph ids as ordinary opaque ids", () => {
+    const grouped = groupSemanticNodes({
+      version: 1,
+      nodes: [{ id: "a" }, { id: "constructor" }],
+      relations: [{
+        id: "toString",
+        source: "a",
+        target: "constructor",
+        direction: "directed",
+      }],
+    }, {
+      group: { id: "__proto__", label: "Opaque group" },
+      nodeIds: ["a", "constructor"],
+    });
+    const collapsed = collapseSemanticGroups(grouped, ["__proto__"]);
+    expect(collapsed.graph.nodes).toEqual([
+      { id: "__proto__", kind: "group", label: "Opaque group" },
+    ]);
+    expect(collapsed.nodeMembers["__proto__"]).toEqual(["a", "constructor"]);
+    expect(collapsed.absorbedRelationIds).toEqual(["toString"]);
+
+    const leftNode: NodeBox = { id: "left", x: 0, y: 100, width: 196, height: 54 };
+    const rightNode: NodeBox = { id: "right", x: 620, y: 100, width: 196, height: 54 };
+    const horizontal = routeOrthogonal(leftNode, rightNode, {
+      sourcePort: "right",
+      targetPort: "left",
+    });
+    const top: NodeBox = { id: "top", x: 202, y: -120, width: 196, height: 54 };
+    const bottom: NodeBox = { id: "bottom", x: 202, y: 300, width: 196, height: 54 };
+    const vertical = routeOrthogonal(top, bottom, {
+      sourcePort: "bottom",
+      targetPort: "top",
+    });
+    expect(routeCrossings([
+      { id: "__proto__", sourceId: "left", targetId: "right", route: horizontal },
+      { id: "constructor", sourceId: "top", targetId: "bottom", route: vertical },
+    ])["__proto__"]).toHaveLength(1);
+  });
+
   it("maps semantic port intent and measured sizes into the 2D projection boundary", () => {
     const projected = semanticGraphToProjectionGraph(semanticGraph, {
       nodeSizes: Object.fromEntries(semanticGraph.nodes.map((node) => [node.id, { width: 120, height: 56 }])),
@@ -297,7 +336,7 @@ describe("ports and routing", () => {
     expect(routeOrthogonal(left, right, {
       obstacles: [left, obstacle, right],
       maximumObstacles: 0,
-    }).strategy).toBe("simple");
+    })).toMatchObject({ strategy: "simple", fallbackReason: "obstacle-limit" });
     expect(inspectRoutedGraph([left, obstacle, right], [{
       id: "edge",
       sourceId: left.id,
@@ -391,6 +430,33 @@ describe("high-level projection", () => {
     const result = projectLayeredGraph(graph, { direction: "left-to-right" });
     expect(result.edges[0]!.endpoints).toEqual({ source: "none", target: "none" });
     expect(result.edges[0]!.route.points.at(-1)).toEqual(result.edges[0]!.route.target);
+  });
+
+  it("rejects non-literal low-level direction, ports, versions, and weights", () => {
+    const malformed = {
+      version: 2,
+      nodes: [
+        { id: "source", width: 100, height: 50 },
+        { id: "target", width: 100, height: 50 },
+      ],
+      edges: [{
+        id: "edge",
+        source: "source",
+        target: "target",
+        direction: ["directed"],
+        sourcePort: ["right"],
+        weight: 0,
+      }],
+    } as unknown as Parameters<typeof validateProjectionGraph>[0];
+    expect(validateProjectionGraph(malformed)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "invalid_version", id: "graph" }),
+      expect.objectContaining({ code: "invalid_direction", id: "edge" }),
+      expect.objectContaining({ code: "invalid_port", id: "edge" }),
+      expect.objectContaining({ code: "invalid_weight", id: "edge" }),
+    ]));
+    expect(() => projectLayeredGraph(malformed, {
+      direction: "left-to-right",
+    })).toThrow(expect.objectContaining({ name: "GraphProjectionError" }));
   });
 
   it("reports missing endpoints without inventing nodes", () => {

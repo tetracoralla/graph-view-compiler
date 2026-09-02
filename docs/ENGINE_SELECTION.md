@@ -1,6 +1,6 @@
 # Engine selection
 
-Graph Projection is not a new graph-drawing research project. It wraps mature
+Graph View Compiler is not a new graph-drawing research project. It wraps mature
 layout work and owns only the cross-product contract and the missing browser
 geometry needed by current consumers.
 

@@ -1,14 +1,13 @@
-# Graph Projection repository contract
+# Graph View Compiler repository contract
 
-`Graph Projection` and `@openadam/graph-projection` are working identifiers,
-not an approved public brand. The owner-confirmed north star is a
-renderer-neutral graph view compiler: applications adapt one authoritative
+`Graph View Compiler` is the public product identity and
+`@openadam/graph-view-compiler` is its npm package identifier. Applications
+adapt one authoritative
 typed graph into a versioned interchange graph, run explicit deterministic
 passes, and receive inspectable view plans and quality diagnostics without
 adopting a shared renderer. The current 0.3 implementation owns that compile
 boundary for layered and caller-positioned 2D views. Do not stretch that claim
-to compound layout, arbitrary backends, shared 3D, or a final public identity,
-and do not publish the working identifiers as the final product name.
+to compound layout, arbitrary backends, or shared 3D.
 
 Read `docs/NORTH_STAR.md` when planning product expansion and
 `docs/PRODUCT_MODEL.md` when stating what the current release actually owns.

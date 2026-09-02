@@ -1,7 +1,7 @@
 import {
   compileGraphView,
   type SemanticGraphV1,
-} from "@openadam/graph-projection/compiler";
+} from "@openadam/graph-view-compiler/compiler";
 
 interface ReleaseTask {
   key: string;

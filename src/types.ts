@@ -190,6 +190,8 @@ export interface OrthogonalRoute {
   points: Point[];
   /** Set by this library: whether obstacle-aware routing produced the geometry. */
   strategy?: "obstacle-avoiding" | "simple";
+  /** Present only when a simple route was used as a bounded fallback. */
+  fallbackReason?: "obstacle-limit" | "no-corridor";
 }
 
 export interface RouteJump extends Point {
@@ -252,6 +254,11 @@ export interface DependencyRelation {
 
 export interface ProjectionIssue {
   code:
+    | "invalid_version"
+    | "invalid_identifier"
+    | "invalid_direction"
+    | "invalid_port"
+    | "invalid_weight"
     | "duplicate_node_id"
     | "duplicate_edge_id"
     | "missing_source"

@@ -1,6 +1,6 @@
 # Performance and cost boundary
 
-Graph Projection has deterministic input and work limits. Timing observations
+Graph View Compiler has deterministic input and work limits. Timing observations
 are environment-specific measurements, not universal performance claims.
 
 ## Hard limits
@@ -10,7 +10,7 @@ are environment-specific measurements, not universal performance claims.
 - ordered passes: 64;
 - path enumeration: 256 returned paths and 10,000 explored states;
 - obstacle-aware routing: caller-selected limit from 0 to 96 unrelated nodes
-  per edge, with explicit simple-route fallback;
+  per edge, with an explicit reason when the simple route is a fallback;
 - detailed geometric inspection: 100,000 estimated pair checks;
 - returned geometric diagnostics: 256 distinct entries plus an explicit limit
   notice.

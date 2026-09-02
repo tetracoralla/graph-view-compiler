@@ -676,26 +676,24 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
       sourceIds: [],
     });
   }
-  const maximumObstacles = routing.maximumObstacles ?? 40;
-  if (nodes.length > maximumObstacles + 2 && edges.length > 0) {
+  if (edges.some((edge) => edge.route.fallbackReason === "obstacle-limit")) {
     diagnostics.push({
       code: "routing_obstacle_limit",
       severity: "warning",
-      message: `Obstacle-aware routing is bounded to ${maximumObstacles} unrelated nodes per edge; simple orthogonal fallback was used`,
+      message: `Obstacle-aware routing is bounded to ${routing.maximumObstacles ?? 40} unrelated nodes per edge; simple orthogonal fallback was used`,
       viewIds: [],
       sourceIds: [],
     });
-  } else {
-    for (const edge of edges) {
-      if (edge.route.strategy !== "simple") continue;
-      diagnostics.push({
-        code: "routing_fallback",
-        severity: "warning",
-        message: `Edge ${edge.id} fell back to simple orthogonal routing because no obstacle-avoiding corridor was found`,
-        viewIds: [edge.id],
-        sourceIds: diagnosticSourceIds(compiled.membership, [edge.id]),
-      });
-    }
+  }
+  for (const edge of edges) {
+    if (edge.route.fallbackReason !== "no-corridor") continue;
+    diagnostics.push({
+      code: "routing_fallback",
+      severity: "warning",
+      message: `Edge ${edge.id} fell back to simple orthogonal routing because no obstacle-avoiding corridor was found`,
+      viewIds: [edge.id],
+      sourceIds: diagnosticSourceIds(compiled.membership, [edge.id]),
+    });
   }
   diagnostics.sort((left, right) =>
     compareGraphIds(`${left.code}\0${left.viewIds.join("\0")}`, `${right.code}\0${right.viewIds.join("\0")}`),

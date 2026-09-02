@@ -5,7 +5,7 @@ products that already know what their nodes and relations mean. It does not
 replace a product document or a domain engine result.
 
 Consumers that need graph operations but not 2D projection import the
-`@openadam/graph-projection/semantic` subpath. This keeps Dagre and routing
+`@openadam/graph-view-compiler/semantic` subpath. This keeps Dagre and routing
 modules out of Dependency Engine and other semantic-only cold starts.
 
 ## Shape

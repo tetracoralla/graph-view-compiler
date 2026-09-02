@@ -565,18 +565,26 @@ export function routeOrthogonalBetweenPorts(
     node.id !== sourceNode.id && node.id !== targetNode.id,
   );
   const stub = options.stub ?? 30;
-  const avoiding = obstacleAvoidingPoints(
-    source,
-    target,
-    source.side,
-    target.side,
-    obstacleNodes,
-    stub,
-    options.clearance ?? 14,
-    options.turnCost ?? 28,
-    options.maximumObstacles ?? 40,
-  );
+  const maximumObstacles = options.maximumObstacles ?? 40;
+  const avoiding = obstacleNodes.length === 0 || obstacleNodes.length > maximumObstacles
+    ? undefined
+    : obstacleAvoidingPoints(
+        source,
+        target,
+        source.side,
+        target.side,
+        obstacleNodes,
+        stub,
+        options.clearance ?? 14,
+        options.turnCost ?? 28,
+        maximumObstacles,
+      );
   const points = avoiding ?? simpleOrthogonalPoints(source, target, source.side, target.side, stub);
+  const fallbackReason = obstacleNodes.length > maximumObstacles
+    ? "obstacle-limit"
+    : obstacleNodes.length > 0 && avoiding === undefined
+      ? "no-corridor"
+      : undefined;
   return {
     source,
     target,
@@ -584,6 +592,7 @@ export function routeOrthogonalBetweenPorts(
     targetPort: target.side,
     points,
     strategy: avoiding === undefined ? "simple" : "obstacle-avoiding",
+    ...(fallbackReason === undefined ? {} : { fallbackReason }),
   };
 }
 
@@ -705,8 +714,8 @@ function interiorCrossing(
 export function routeCrossings(
   edges: readonly RoutedEdge[],
 ): Readonly<Record<string, readonly RouteJump[]>> {
-  const crossings: Record<string, RouteJump[]> = {};
-  edges.forEach((edge) => { crossings[edge.id] = []; });
+  const crossings = new Map<string, RouteJump[]>();
+  edges.forEach((edge) => { crossings.set(edge.id, []); });
   for (let leftIndex = 0; leftIndex < edges.length; leftIndex += 1) {
     const left = edges[leftIndex]!;
     for (let rightIndex = leftIndex + 1; rightIndex < edges.length; rightIndex += 1) {
@@ -722,10 +731,10 @@ export function routeCrossings(
           const leftHorizontal = Math.abs(leftSource.y - leftTarget.y) < EPSILON;
           const bridgeEdge = leftHorizontal ? left : right;
           const segmentIndex = leftHorizontal ? leftSegment : rightSegment;
-          crossings[bridgeEdge.id]!.push({ ...crossing, segmentIndex });
+          crossings.get(bridgeEdge.id)?.push({ ...crossing, segmentIndex });
         });
       });
     }
   }
-  return crossings;
+  return Object.fromEntries(crossings);
 }

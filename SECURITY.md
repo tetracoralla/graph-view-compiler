@@ -1,6 +1,6 @@
 # Security policy
 
-Graph Projection is a pure in-process geometry library. It performs no network,
+Graph View Compiler is a pure in-process graph compiler. It performs no network,
 filesystem, shell, credential, or external application operations. Report a
 suspected vulnerability privately through the repository's GitHub security
 advisory flow when the public repository is available.

@@ -7,11 +7,17 @@ const manifest = JSON.parse(await readFile("package.json", "utf8"));
 const license = await readFile("LICENSE", "utf8");
 const notice = await readFile("NOTICE", "utf8");
 
-assert.equal(manifest.name, "@openadam/graph-projection");
+assert.equal(manifest.name, "@openadam/graph-view-compiler");
 assert.equal(manifest.version, "0.3.0");
 assert.equal(manifest.private, undefined, "the independently distributable package cannot be private");
 assert.equal(manifest.license, "Apache-2.0");
 assert.equal(manifest.publishConfig?.access, "public");
+assert.equal(manifest.publishConfig?.registry, "https://registry.npmjs.org/");
+assert.equal(
+  manifest.publishConfig?.provenance,
+  undefined,
+  "local first publication cannot generate CI provenance; trusted publishing adds it automatically",
+);
 assert.match(notice, /Copyright 2026 openAdam/u);
 assert.equal(
   createHash("sha256").update(license).digest("hex"),
@@ -44,6 +50,7 @@ for (const required of [
   "docs/COMPILER.md",
   "docs/PAIN_CASES.md",
   "docs/PERFORMANCE.md",
+  "docs/RELEASING.md",
   "docs/SEMANTIC_GRAPH.md",
   "CHANGELOG.md",
   "README.md",

@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 
-const workspace = await mkdtemp(path.join(os.tmpdir(), "graph-projection-install-"));
+const workspace = await mkdtemp(path.join(os.tmpdir(), "graph-view-compiler-install-"));
 const packageDirectory = path.join(workspace, "package");
 const consumerDirectory = path.join(workspace, "consumer");
 await Promise.all([
@@ -21,7 +21,7 @@ try {
   const report = JSON.parse(packed.stdout);
   const tarball = path.join(packageDirectory, report[0].filename);
   await writeFile(path.join(consumerDirectory, "package.json"), JSON.stringify({
-    name: "graph-projection-packed-consumer",
+    name: "graph-view-compiler-packed-consumer",
     private: true,
     type: "module",
   }, null, 2));
@@ -36,12 +36,12 @@ try {
       GRAPH_PROJECTION_VERSION,
       endpointStylesForDirection,
       projectLayeredGraph,
-    } from "@openadam/graph-projection";
+    } from "@openadam/graph-view-compiler";
     import {
       SEMANTIC_GRAPH_VERSION,
       findSemanticPaths,
       semanticGraphToProjectionGraph,
-    } from "@openadam/graph-projection/semantic";
+    } from "@openadam/graph-view-compiler/semantic";
     const projected = projectLayeredGraph({
       version: GRAPH_PROJECTION_VERSION,
       nodes: [
@@ -97,7 +97,7 @@ try {
   assert.equal(consumerResult.backend, "dagre-layered-v1");
   assert.deepEqual(consumerResult.nodeIds, ["client", "contract", "release"]);
   const installedManifest = JSON.parse(await readFile(
-    path.join(consumerDirectory, "node_modules/@openadam/graph-projection/package.json"),
+    path.join(consumerDirectory, "node_modules/@openadam/graph-view-compiler/package.json"),
     "utf8",
   ));
   assert.equal(installedManifest.version, "0.3.0");

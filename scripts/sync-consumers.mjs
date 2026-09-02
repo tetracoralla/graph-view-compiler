@@ -7,7 +7,7 @@ import path from "node:path";
 
 const consumers = process.argv.slice(2).map((value) => path.resolve(value));
 assert.ok(consumers.length > 0, "pass one or more consumer repository paths");
-const workspace = await mkdtemp(path.join(os.tmpdir(), "graph-projection-sync-"));
+const workspace = await mkdtemp(path.join(os.tmpdir(), "graph-view-compiler-sync-"));
 
 try {
   const packed = spawnSync("npm", ["pack", "--json", "--pack-destination", workspace], {
@@ -24,8 +24,8 @@ try {
   for (const consumer of consumers) {
     const manifest = JSON.parse(await readFile(path.join(consumer, "package.json"), "utf8"));
     const expected = `file:vendor/${filename}`;
-    const declared = manifest.dependencies?.["@openadam/graph-projection"] ??
-      manifest.devDependencies?.["@openadam/graph-projection"];
+    const declared = manifest.dependencies?.["@openadam/graph-view-compiler"] ??
+      manifest.devDependencies?.["@openadam/graph-view-compiler"];
     assert.equal(
       declared,
       expected,
@@ -43,14 +43,14 @@ try {
     const lock = JSON.parse(await readFile(lockPath, "utf8"));
     if (lock.packages && typeof lock.packages === "object") {
       for (const installedPath of [
-        "node_modules/@openadam/graph-projection",
+        "node_modules/@openadam/graph-view-compiler",
         "node_modules/@dagrejs/dagre",
         "node_modules/@dagrejs/graphlib",
       ]) delete lock.packages[installedPath];
       await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
     }
     for (const installedPath of [
-      "node_modules/@openadam/graph-projection",
+      "node_modules/@openadam/graph-view-compiler",
       "node_modules/@dagrejs/dagre",
       "node_modules/@dagrejs/graphlib",
     ]) await rm(path.join(consumer, installedPath), { recursive: true, force: true });
@@ -67,7 +67,7 @@ try {
     const probed = spawnSync(process.execPath, [
       "--input-type=module",
       "--eval",
-      "const semantic = await import('@openadam/graph-projection/semantic'); if (semantic.SEMANTIC_GRAPH_VERSION !== 1) process.exit(2);",
+      "const semantic = await import('@openadam/graph-view-compiler/semantic'); if (semantic.SEMANTIC_GRAPH_VERSION !== 1) process.exit(2);",
     ], {
       cwd: consumer,
       encoding: "utf8",

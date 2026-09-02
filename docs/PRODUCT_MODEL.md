@@ -4,7 +4,7 @@ Status: current implemented 0.3 boundary. The owner-confirmed target is defined
 in the [North star](NORTH_STAR.md); target capabilities are not current-release
 claims.
 
-Graph Projection is a deterministic library boundary between a product's
+Graph View Compiler is a deterministic library boundary between a product's
 authoritative graph and its renderer. It owns a portable semantic interchange
 graph plus renderer-neutral 2D projection; products retain their domain graph
 as source of truth.
@@ -55,4 +55,4 @@ registry publication, consumer repositories vendor one exact tarball and its
 SHA-256 sidecar so standalone checkouts do not depend on a sibling directory.
 Published consumers pin a registry version. Browser, desktop, and plugin builds
 bundle the runtime code, so external product users do not need Node.js or a
-separate Graph Projection installation.
+separate Graph View Compiler installation.

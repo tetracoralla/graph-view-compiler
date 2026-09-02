@@ -206,6 +206,27 @@ describe("graph view compiler", () => {
     ]));
   });
 
+  it("does not report a fallback when a simple route has no obstacles to avoid", () => {
+    const graph: SemanticGraphV1 = {
+      version: 1,
+      nodes: [{ id: "a" }, { id: "b" }],
+      relations: [{ id: "ab", source: "a", target: "b", direction: "directed" }],
+    };
+    const plan = compileGraphView({
+      graph,
+      nodeSizes: { a: { width: 100, height: 50 }, b: { width: 100, height: 50 } },
+      profile: {
+        type: "fixed",
+        positions: { a: { x: 0, y: 0 }, b: { x: 300, y: 0 } },
+      },
+    });
+    expect(plan.edges[0]?.route).toMatchObject({ strategy: "simple" });
+    expect(plan.edges[0]?.route.fallbackReason).toBeUndefined();
+    expect(plan.diagnostics.some((diagnostic) =>
+      diagnostic.code === "routing_fallback" || diagnostic.code === "routing_obstacle_limit",
+    )).toBe(false);
+  });
+
   it("bounds quadratic inspection and reports that the metrics are incomplete", () => {
     const relations = Array.from({ length: 500 }, (_, index) => ({
       id: `edge-${String(index).padStart(3, "0")}`,
@@ -353,6 +374,7 @@ describe("graph view compiler", () => {
       },
     });
     expect(plan.edges.find((edge) => edge.id === "ab")?.route.strategy).toBe("simple");
+    expect(plan.edges.find((edge) => edge.id === "ab")?.route.fallbackReason).toBe("no-corridor");
     expect(plan.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "routing_fallback", viewIds: ["ab"] }),
     ]));

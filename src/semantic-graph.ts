@@ -575,12 +575,12 @@ export function collapseSemanticGroups(
   ]));
   const usedProxies = new Set([...proxyByNode.values()].filter((id) => selected.has(id)));
   const nodes: SemanticNode[] = [];
-  const nodeMembers: Record<string, string[]> = {};
+  const nodeMembersById = new Map<string, string[]>();
   for (const node of normalized.nodes) {
     const proxyId = proxyByNode.get(node.id) ?? node.id;
-    const members = nodeMembers[proxyId] ?? [];
+    const members = nodeMembersById.get(proxyId) ?? [];
     members.push(node.id);
-    nodeMembers[proxyId] = members;
+    nodeMembersById.set(proxyId, members);
     if (proxyId === node.id) nodes.push(cloneNode(node));
   }
   for (const groupId of [...usedProxies].sort(compareGraphIds)) {
@@ -595,7 +595,7 @@ export function collapseSemanticGroups(
     });
   }
   const relations: SemanticRelation[] = [];
-  const relationMembers: Record<string, string[]> = {};
+  const relationMembersById = new Map<string, string[]>();
   const absorbedRelationIds: string[] = [];
   for (const relation of normalized.relations) {
     const source = proxyByNode.get(relation.source) ?? relation.source;
@@ -620,7 +620,7 @@ export function collapseSemanticGroups(
         ? { targetPort: relation.targetPort }
         : {}),
     });
-    relationMembers[relation.id] = [relation.id];
+    relationMembersById.set(relation.id, [relation.id]);
   }
   const descendants = groupDescendants(groups);
   const removedGroups = new Set<string>();
@@ -634,7 +634,9 @@ export function collapseSemanticGroups(
     relations,
     ...(remainingGroups.length === 0 ? {} : { groups: remainingGroups }),
   });
-  for (const members of Object.values(nodeMembers)) members.sort(compareGraphIds);
+  for (const members of nodeMembersById.values()) members.sort(compareGraphIds);
+  const nodeMembers = Object.fromEntries(nodeMembersById);
+  const relationMembers = Object.fromEntries(relationMembersById);
   absorbedRelationIds.sort(compareGraphIds);
   return { graph: collapsed, nodeMembers, relationMembers, absorbedRelationIds };
 }
