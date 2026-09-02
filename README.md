@@ -6,7 +6,7 @@ The package provides three deliberately separate layers:
 
 - a versioned renderer-neutral semantic graph with deterministic filtering,
   slicing, paths, grouping, and collapse;
-- a deterministic 2D projection boundary for consumer-measured nodes.
+- a deterministic 2D projection boundary for consumer-measured nodes;
 - an ordered graph view compiler that combines named semantic passes, layered
   or fixed-position projection, source membership, change reconciliation, and
   bounded quality diagnostics.
@@ -30,11 +30,11 @@ See [engine selection](docs/ENGINE_SELECTION.md) for the Dagre/ELK.js/
 Graphviz/libavoid boundary and why this package is not an Agent replacement for
 traditional graph libraries.
 
-The owner-confirmed target is a broader renderer-neutral
-[graph view compiler](docs/NORTH_STAR.md). That document defines future work and
-explicit non-goals; it must not be read as a claim that the current 0.3 package
-already implements every target capability. The current 0.3 API is described
-by the [compiler contract](docs/COMPILER.md).
+The owner-confirmed product is a renderer-neutral
+[graph view compiler](docs/NORTH_STAR.md). The current 0.3 API implements its
+stable narrow waist for layered and caller-positioned 2D views; the document
+also defines explicit non-goals and the conditions for future expansion. The
+public contract is described by the [compiler contract](docs/COMPILER.md).
 The [user-pain conformance matrix](docs/PAIN_CASES.md) records which recurrent
 integration failures are supported, rejected, or still bounded.
 See the [performance boundary](docs/PERFORMANCE.md) for hard work limits and a
@@ -68,7 +68,7 @@ version:
 
 Before registry publication, Calligram, Laniakea, and Dependency Engine keep the exact packed
 tarball in their own `vendor/` directories so a standalone source checkout can
-run `npm ci`. After changing this package, refresh both consumers with:
+run `npm ci`. After changing this package, refresh all three consumers with:
 
 ```sh
 npm run sync:consumers -- ../visual-document ../laniakea ../graph-dependency-solver

@@ -1,9 +1,9 @@
 # North star: a renderer-neutral graph view compiler
 
-Status: owner-confirmed target product definition. This document directs future
-work; it is not a claim that every capability below exists in the current
-package. `Graph Projection` remains a working name until the product boundary is
-proven and the owner approves a public brand.
+Status: owner-confirmed product definition. The current 0.3 package implements
+the stable narrow waist described here for layered and caller-positioned 2D
+views. `Graph Projection` remains a working name until the owner approves a
+public brand.
 
 ## The job
 
@@ -150,12 +150,18 @@ The product has reached a defensible end state when:
 5. adding a backend or product adapter does not change the semantic contract or
    require consumers to adopt another product's renderer.
 
-## Current gap from 0.2
+## Current 0.3 closure
 
-The current 0.3 package implements the semantic graph, bounded core operations,
+The current package implements the semantic graph, bounded core operations,
 ordered compiler contract, layered and fixed-position profiles, shared routing,
-source membership, change reconciliation, anchor alignment, and bounded
-geometric diagnostics. Node dimensions are an explicit caller-owned measurement
-boundary. Backend comparison fixtures and broader browser/build performance
-baselines remain unfinished; those are implementation work, not documentation
-claims.
+source membership, change reconciliation, anchor alignment, explicit caller
+measurements and edge weights, and bounded geometric diagnostics. The public
+pain cases have supported, rejected, or bounded executable outcomes. An
+unrelated packed consumer and the three product adapters exercise the package
+without adopting a shared renderer.
+
+This closes the current compile boundary; it does not freeze the product. A new
+layout backend, expanded compound-group placement, or 3D projection belongs only
+after a current consumer and comparative fixture demonstrate that it serves the
+same job better without changing semantic meaning. Public brand selection and
+registry publication are separate owner decisions, not missing compiler work.

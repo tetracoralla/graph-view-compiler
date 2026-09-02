@@ -5,9 +5,10 @@ not an approved public brand. The owner-confirmed north star is a
 renderer-neutral graph view compiler: applications adapt one authoritative
 typed graph into a versioned interchange graph, run explicit deterministic
 passes, and receive inspectable view plans and quality diagnostics without
-adopting a shared renderer. The current 0.2 implementation is only the first
-semantic and 2D-projection slice of that target. Do not describe the target as
-implemented or publish the working identifiers as the final product name.
+adopting a shared renderer. The current 0.3 implementation owns that compile
+boundary for layered and caller-positioned 2D views. Do not stretch that claim
+to compound layout, arbitrary backends, shared 3D, or a final public identity,
+and do not publish the working identifiers as the final product name.
 
 Read `docs/NORTH_STAR.md` when planning product expansion and
 `docs/PRODUCT_MODEL.md` when stating what the current release actually owns.

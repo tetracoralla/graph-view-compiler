@@ -7,9 +7,9 @@ adapter from a product's authoritative typed graph, one versioned semantic
 boundary, ordered deterministic passes, and inspectable view plans and quality
 diagnostics for different product-owned renderers.
 
-The current phase is implementation and independent validation. `Graph
-Projection` and `@openadam/graph-projection` remain working identifiers until
-the product boundary is proven and the owner approves a public brand.
+The local implementation and independent validation phase is closed at 0.3.
+`Graph Projection` and `@openadam/graph-projection` remain working identifiers
+until the owner approves a public brand.
 
 ## Current campaign finish line
 
@@ -30,24 +30,26 @@ the product boundary is proven and the owner approves a public brand.
   publication, signing credentials, and other public distribution remain
   owner-only external actions.
 
-## Current state
+## Local closure snapshot
 
-- Graph Projection commit `0b057856af3e` contains the 0.2 semantic graph,
-  bounded operations, current 2D projection, compatibility policy, examples,
-  and packed-install checks. Nineteen current tests, build, examples, release
-  inventory, isolated packed install, and production dependency audit passed
-  before this campaign definition.
-- Calligram commit `06489fa3c590` contains its desktop and portable delivery plus
-  the 0.2 adapter. Ninety current tests, Web/Server/Desktop/MCP/Plugin builds,
-  isolated packed install, and production dependency audit passed.
-- Laniakea and Deterministic Dependency Engine contain uncommitted prior 0.2
-  consumer integrations. They must be independently reviewed and committed
-  before further cross-repository changes.
-- All three consumers still vendor the same earlier 0.2 tarball with SHA-256
-  `13cfa6b7df2bdef0995525478c12a67bf1edfd3aca0244d55131de3aef7cdaf9`.
-  It predates the committed Unicode ordering, path-work bound, and undeclared
-  field isolation fixes and must be refreshed from commit `0b057856af3e`.
-- No final public identity or publication is approved.
+Snapshot date: 2026-09-02. Current source and rerun results remain authoritative.
+
+- Graph Projection 0.3 provides the compiled view contract, conformance cases,
+  hard work limits, isolated packed install, unrelated typed consumer, examples,
+  and rerunnable compiler measurements.
+- Calligram commit `ef42b00` compiles its real document graph through the layered
+  profile and bundles the compiler into its self-contained CLI, desktop, Web,
+  MCP, plugin, and portable-delivery builds.
+- Laniakea commit `3877815` compiles its real Flow connectors through the fixed
+  profile while retaining its own node placement, interaction, renderer, and
+  crossing bridges.
+- Deterministic Dependency Engine commit `ea546b8` consumes only the 0.3 semantic
+  subpath. Sphere remains its private 3D renderer and does not bundle the 2D
+  compiler or Dagre into the browser surface.
+- All three consumers pin the exact 0.3 artifact with SHA-256
+  `344bbd1eebe00b32de9cd70a0cb47de3699830cdc180212ba365c86bbd008c1d`.
+- No final public identity, public repository mutation, push, or npm publication
+  is approved.
 
 ## Validation ladder
 
@@ -80,7 +82,7 @@ or a product-value choice that changes the north star.
 
 ## Next action
 
-Review the existing Laniakea and Deterministic Dependency Engine 0.2 consumer
-changes, refresh all consumers to the exact artifact from `0b057856af3e`, rerun
-current checks, and create clean local baseline commits. Then implement the
-ordered compiler contract from that stable cross-product boundary.
+Choose the public brand and package migration, then separately authorize public
+repository and npm release actions. Until that owner decision, future compiler
+work must begin with a current consumer pain, comparative fixture, or observed
+regression; there is no remaining speculative platform phase to execute.
