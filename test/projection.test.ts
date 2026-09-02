@@ -3,19 +3,190 @@ import {
   GRAPH_PROJECTION_VERSION,
   MAX_PROJECTION_EDGES,
   MAX_PROJECTION_NODES,
+  MAX_SEMANTIC_PATH_STATES,
   allocateRectanglePorts,
   dependencyRelationToProjectionEdge,
   endpointStylesForDirection,
   inspectRoutedGraph,
+  collapseSemanticGroups,
+  compareGraphIds,
+  filterSemanticGraph,
+  findSemanticPaths,
+  groupSemanticNodes,
   layoutLayeredGraph,
+  normalizeSemanticGraph,
   projectLayeredGraph,
   roundedOrthogonalPath,
   routeCrossings,
   routeOrthogonal,
+  semanticGraphToProjectionGraph,
+  sliceSemanticGraph,
   validateProjectionGraph,
+  validateSemanticGraph,
   type NodeBox,
   type RoutedEdge,
+  type SemanticGraphV1,
 } from "../src/index.js";
+
+const semanticGraph = {
+  version: 1 as const,
+  nodes: [
+    { id: "publish", label: "Publish", groupId: "release" },
+    { id: "schema", label: "Schema", groupId: "foundation", ports: [{ id: "out", preferredSide: "right" as const }] },
+    { id: "build", label: "Build", groupId: "release", ports: [{ id: "in", preferredSide: "left" as const }] },
+    { id: "review", label: "Review", groupId: "release" },
+  ],
+  relations: [
+    { id: "schema-build", source: "schema", target: "build", direction: "directed" as const, kind: "requires", sourcePort: "out", targetPort: "in" },
+    { id: "build-review", source: "build", target: "review", direction: "directed" as const, kind: "requires" },
+    { id: "review-publish", source: "review", target: "publish", direction: "directed" as const, kind: "requires" },
+  ],
+  groups: [
+    { id: "foundation", label: "Foundation" },
+    { id: "release", label: "Release" },
+  ],
+};
+
+describe("versioned semantic graph", () => {
+  it("orders full Unicode code points and strips undeclared product state", () => {
+    expect(compareGraphIds("\uE000", "😀")).toBeLessThan(0);
+    const normalized = normalizeSemanticGraph({
+      version: 1,
+      nodes: [{ id: "node", ports: [{ id: "port", preferredSide: "right", color: "red" }] }],
+      relations: [{
+        id: "edge",
+        source: "node",
+        target: "node",
+        direction: "directed",
+        camera: { zoom: 2 },
+      }],
+      groups: [{ id: "group", selection: true }],
+    } as unknown as SemanticGraphV1);
+    expect(normalized).toEqual({
+      version: 1,
+      nodes: [{ id: "node", ports: [{ id: "port", preferredSide: "right" }] }],
+      relations: [{ id: "edge", source: "node", target: "node", direction: "directed" }],
+      groups: [{ id: "group" }],
+    });
+  });
+
+  it("normalizes nodes, relations, groups, and ports with code-point ordering", () => {
+    const shuffled = {
+      ...semanticGraph,
+      nodes: [...semanticGraph.nodes].reverse(),
+      relations: [...semanticGraph.relations].reverse(),
+      groups: [...semanticGraph.groups].reverse(),
+    };
+    expect(validateSemanticGraph(shuffled)).toEqual([]);
+    const normalized = normalizeSemanticGraph(shuffled);
+    expect(normalized.nodes.map((node) => node.id)).toEqual(["build", "publish", "review", "schema"]);
+    expect(normalized.relations.map((relation) => relation.id)).toEqual([
+      "build-review",
+      "review-publish",
+      "schema-build",
+    ]);
+  });
+
+  it("filters and slices without inventing relations", () => {
+    expect(filterSemanticGraph(semanticGraph, { groupIds: ["release"] }).nodes.map((node) => node.id)).toEqual([
+      "build",
+      "publish",
+      "review",
+    ]);
+    const slice = sliceSemanticGraph(semanticGraph, {
+      focus: ["build"],
+      direction: "outgoing",
+      maxDepth: 1,
+    });
+    expect(slice.nodes.map((node) => node.id)).toEqual(["build", "review"]);
+    expect(slice.relations.map((relation) => relation.id)).toEqual(["build-review"]);
+  });
+
+  it("finds deterministic bounded paths with relation provenance", () => {
+    expect(findSemanticPaths(semanticGraph, { from: "schema", to: "publish" })).toEqual([{
+      nodes: ["schema", "build", "review", "publish"],
+      relations: ["schema-build", "build-review", "review-publish"],
+    }]);
+  });
+
+  it("fails explicitly when path exploration exceeds its deterministic work budget", () => {
+    const connectedNodeCount = 20;
+    const graph = {
+      version: 1 as const,
+      nodes: [
+        ...Array.from({ length: connectedNodeCount }, (_, index) => ({ id: `n${index}` })),
+        { id: "isolated-target" },
+      ],
+      relations: Array.from({ length: connectedNodeCount }, (_, source) =>
+        Array.from({ length: connectedNodeCount - source - 1 }, (_unused, offset) => {
+          const target = source + offset + 1;
+          return {
+            id: `n${source}-n${target}`,
+            source: `n${source}`,
+            target: `n${target}`,
+            direction: "directed" as const,
+          };
+        })).flat(),
+    };
+    expect(MAX_SEMANTIC_PATH_STATES).toBe(10_000);
+    try {
+      findSemanticPaths(graph, { from: "n0", to: "isolated-target", maxDepth: 20 });
+      throw new Error("expected path work limit");
+    } catch (error) {
+      expect(error).toMatchObject({
+        issues: [expect.objectContaining({ code: "work_limit_exceeded" })],
+      });
+    }
+  });
+
+  it("groups and collapses as a derived view while retaining membership", () => {
+    const ungrouped = {
+      version: 1 as const,
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      relations: [
+        { id: "ab", source: "a", target: "b", direction: "directed" as const },
+        { id: "bc", source: "b", target: "c", direction: "directed" as const },
+      ],
+    };
+    const grouped = groupSemanticNodes(ungrouped, {
+      group: { id: "pair", label: "Pair" },
+      nodeIds: ["a", "b"],
+    });
+    const collapsed = collapseSemanticGroups(grouped, ["pair"]);
+    expect(collapsed.graph.nodes).toEqual([
+      { id: "c" },
+      { id: "pair", kind: "group", label: "Pair" },
+    ]);
+    expect(collapsed.graph.relations).toEqual([
+      { id: "bc", source: "pair", target: "c", direction: "directed" },
+    ]);
+    expect(collapsed.nodeMembers.pair).toEqual(["a", "b"]);
+    expect(collapsed.relationMembers.bc).toEqual(["bc"]);
+  });
+
+  it("maps semantic port intent and measured sizes into the 2D projection boundary", () => {
+    const projected = semanticGraphToProjectionGraph(semanticGraph, {
+      nodeSizes: Object.fromEntries(semanticGraph.nodes.map((node) => [node.id, { width: 120, height: 56 }])),
+    });
+    expect(projected.edges.find((edge) => edge.id === "schema-build")).toMatchObject({
+      sourcePort: "right",
+      targetPort: "left",
+    });
+    expect(projectLayeredGraph(projected, { direction: "left-to-right" }).nodes).toHaveLength(4);
+  });
+
+  it("rejects dangling ports and cross-namespace group ids", () => {
+    expect(validateSemanticGraph({
+      version: 1,
+      nodes: [{ id: "same", ports: [{ id: "known" }] }],
+      relations: [{ id: "edge", source: "same", target: "same", direction: "directed", sourcePort: "missing" }],
+      groups: [{ id: "same" }],
+    })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "duplicate_graph_id", id: "same" }),
+      expect.objectContaining({ code: "missing_source_port", id: "edge" }),
+    ]));
+  });
+});
 
 describe("semantic direction", () => {
   it("only uses two arrows for an explicitly bidirectional relation", () => {

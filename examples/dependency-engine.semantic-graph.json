@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "nodes": [
+    { "id": "schema", "label": "Schema", "kind": "dependency" },
+    { "id": "build", "label": "Build", "kind": "dependency" },
+    { "id": "release", "label": "Release", "kind": "dependency" }
+  ],
+  "relations": [
+    { "id": "requires:build:schema", "source": "schema", "target": "build", "direction": "directed", "kind": "requires" },
+    { "id": "requires:release:build", "source": "build", "target": "release", "direction": "directed", "kind": "requires" }
+  ]
+}

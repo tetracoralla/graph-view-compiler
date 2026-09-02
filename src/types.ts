@@ -1,10 +1,123 @@
 export const GRAPH_PROJECTION_VERSION = 1 as const;
+export const SEMANTIC_GRAPH_VERSION = 1 as const;
 export const MAX_PROJECTION_NODES = 2_000 as const;
 export const MAX_PROJECTION_EDGES = 8_000 as const;
+export const MAX_SEMANTIC_NODES = 5_000 as const;
+export const MAX_SEMANTIC_RELATIONS = 20_000 as const;
+export const MAX_SEMANTIC_GROUPS = 2_000 as const;
+export const MAX_SEMANTIC_PATHS = 256 as const;
+export const MAX_SEMANTIC_PATH_STATES = 10_000 as const;
 
 export type RelationDirection = "directed" | "undirected" | "bidirectional";
 export type EndpointStyle = "none" | "arrow" | "dot" | "ring";
 export type PortSide = "top" | "right" | "bottom" | "left";
+
+export interface SemanticPort {
+  id: string;
+  kind?: string;
+  preferredSide?: PortSide;
+}
+
+export interface SemanticNode {
+  id: string;
+  label?: string;
+  kind?: string;
+  groupId?: string;
+  ports?: SemanticPort[];
+}
+
+export interface SemanticRelation {
+  id: string;
+  source: string;
+  target: string;
+  direction: RelationDirection;
+  label?: string;
+  kind?: string;
+  sourcePort?: string;
+  targetPort?: string;
+}
+
+export interface SemanticGroup {
+  id: string;
+  label?: string;
+  parentGroupId?: string;
+}
+
+export interface SemanticGraphV1 {
+  version: typeof SEMANTIC_GRAPH_VERSION;
+  nodes: SemanticNode[];
+  relations: SemanticRelation[];
+  groups?: SemanticGroup[];
+}
+
+export interface SemanticGraphIssue {
+  code:
+    | "invalid_graph"
+    | "invalid_version"
+    | "invalid_identifier"
+    | "invalid_direction"
+    | "duplicate_node_id"
+    | "duplicate_relation_id"
+    | "duplicate_group_id"
+    | "duplicate_graph_id"
+    | "duplicate_port_id"
+    | "missing_source"
+    | "missing_target"
+    | "missing_group"
+    | "missing_parent_group"
+    | "group_cycle"
+    | "missing_source_port"
+    | "missing_target_port"
+    | "missing_node_size"
+    | "unknown_selection"
+    | "invalid_option"
+    | "too_many_nodes"
+    | "too_many_relations"
+    | "too_many_groups"
+    | "work_limit_exceeded";
+  message: string;
+  id: string;
+}
+
+export interface SemanticGraphFilter {
+  nodeIds?: readonly string[];
+  groupIds?: readonly string[];
+  relationKinds?: readonly string[];
+}
+
+export interface SemanticGraphSlice {
+  focus: readonly string[];
+  direction: "outgoing" | "incoming" | "both";
+  maxDepth?: number;
+}
+
+export interface SemanticPathQuery {
+  from: string;
+  to: string;
+  direction?: "outgoing" | "incoming" | "both";
+  maxDepth?: number;
+  maxPaths?: number;
+}
+
+export interface SemanticPath {
+  nodes: string[];
+  relations: string[];
+}
+
+export interface SemanticGroupAssignment {
+  group: SemanticGroup;
+  nodeIds: readonly string[];
+}
+
+export interface CollapsedSemanticGraph {
+  graph: SemanticGraphV1;
+  nodeMembers: Readonly<Record<string, readonly string[]>>;
+  relationMembers: Readonly<Record<string, readonly string[]>>;
+}
+
+export interface SemanticProjectionOptions {
+  nodeSizes: Readonly<Record<string, { width: number; height: number }>>;
+}
 
 export interface Point {
   x: number;

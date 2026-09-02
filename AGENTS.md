@@ -1,9 +1,10 @@
 # Graph Projection repository contract
 
 This repository owns a deterministic, renderer-neutral graph projection
-library. It is a reusable geometry dependency for products that already own a
-typed semantic graph. It does not infer business relations, call a model, own a
-document format, or replace Deterministic Dependency Engine.
+library. It owns a renderer-neutral semantic interchange graph, bounded pure
+graph operations, and reusable geometry for products that already own a typed
+domain graph. It does not infer business relations, call a model, own a document
+format, or replace Deterministic Dependency Engine.
 
 ## Product invariants
 
@@ -15,6 +16,8 @@ document format, or replace Deterministic Dependency Engine.
 - Nodes connect at declared rectangle-side ports. Routes start and end exactly
   at those boundary points.
 - Layout and routing are deterministic for the same ordered input and options.
+- Semantic normalization, filtering, slicing, path enumeration, grouping, and
+  collapse are deterministic; collapse returns explicit source membership.
 - Product colors, typography, selection, camera, persistence, and interaction
   state remain with consumers.
 - A projection graph is a derived in-memory boundary. Consumers keep their own

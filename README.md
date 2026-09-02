@@ -2,7 +2,13 @@
 
 Deterministic geometry for applications that already own a typed graph.
 
-The package provides:
+The package provides two deliberately separate layers:
+
+- a versioned renderer-neutral semantic graph with deterministic filtering,
+  slicing, paths, grouping, and collapse;
+- a deterministic 2D projection boundary for consumer-measured nodes.
+
+The projection layer provides:
 
 - layered node placement backed by Dagre;
 - rectangle-side port selection and allocation;
@@ -42,7 +48,7 @@ version:
 ```json
 {
   "dependencies": {
-    "@openadam/graph-projection": "0.1.0"
+      "@openadam/graph-projection": "0.2.0"
   }
 }
 ```
@@ -64,6 +70,14 @@ The high-level portable graph contract accepts at most 2,000 nodes and 8,000
 edges per projection call. Products with tighter interaction or document
 budgets should enforce their smaller product-specific limits before calling the
 library.
+
+The semantic graph accepts at most 5,000 nodes, 20,000 relations, and 2,000
+groups. Path results and traversal depth are separately bounded. See the
+[semantic graph contract](docs/SEMANTIC_GRAPH.md) and
+[compatibility policy](docs/COMPATIBILITY.md).
+
+Semantic-only consumers import `@openadam/graph-projection/semantic` so the
+layered layout backend is not part of their runtime module graph.
 
 ## License
 

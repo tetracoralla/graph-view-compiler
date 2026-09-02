@@ -1,7 +1,7 @@
 {
   "name": "@openadam/graph-projection",
-  "version": "0.1.0",
-  "description": "Deterministic layered layout, ports, orthogonal routing, and endpoint semantics for typed graphs.",
+  "version": "0.2.0",
+  "description": "Versioned semantic graph operations and deterministic renderer-neutral 2D projection for typed products.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "openAdam",
@@ -21,12 +21,20 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./semantic": {
+      "types": "./dist/semantic.d.ts",
+      "import": "./dist/semantic.js"
     }
   },
   "files": [
     "dist",
+    "examples",
+    "docs/COMPATIBILITY.md",
+    "docs/SEMANTIC_GRAPH.md",
     "docs/ENGINE_SELECTION.md",
     "docs/PRODUCT_MODEL.md",
+    "CHANGELOG.md",
     "README.md",
     "CONTRIBUTING.md",
     "LICENSE",
@@ -38,11 +46,12 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
+    "check:examples": "node scripts/check-examples.mjs",
     "check:release": "node scripts/check-release.mjs",
     "check:packed-install": "node scripts/check-packed-install.mjs",
     "sync:consumers": "node scripts/sync-consumers.mjs",
     "prepack": "npm run build",
-    "check": "npm run typecheck && npm test && npm run build && npm run check:release && npm run check:packed-install"
+    "check": "npm run typecheck && npm test && npm run build && npm run check:examples && npm run check:release && npm run check:packed-install"
   },
   "dependencies": {
     "@dagrejs/dagre": "3.1.1"

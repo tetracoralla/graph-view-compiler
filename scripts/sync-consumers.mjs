@@ -24,8 +24,10 @@ try {
   for (const consumer of consumers) {
     const manifest = JSON.parse(await readFile(path.join(consumer, "package.json"), "utf8"));
     const expected = `file:vendor/${filename}`;
+    const declared = manifest.dependencies?.["@openadam/graph-projection"] ??
+      manifest.devDependencies?.["@openadam/graph-projection"];
     assert.equal(
-      manifest.dependencies?.["@openadam/graph-projection"],
+      declared,
       expected,
       `${consumer} must pin ${expected} before synchronization`,
     );
@@ -37,12 +39,40 @@ try {
       `${hash}  ${filename}\n`,
       "utf8",
     );
-    const installed = spawnSync("npm", ["install", "--ignore-scripts"], {
+    const lockPath = path.join(consumer, "package-lock.json");
+    const lock = JSON.parse(await readFile(lockPath, "utf8"));
+    if (lock.packages && typeof lock.packages === "object") {
+      for (const installedPath of [
+        "node_modules/@openadam/graph-projection",
+        "node_modules/@dagrejs/dagre",
+        "node_modules/@dagrejs/graphlib",
+      ]) delete lock.packages[installedPath];
+      await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
+    }
+    for (const installedPath of [
+      "node_modules/@openadam/graph-projection",
+      "node_modules/@dagrejs/dagre",
+      "node_modules/@dagrejs/graphlib",
+    ]) await rm(path.join(consumer, installedPath), { recursive: true, force: true });
+    const installed = spawnSync("npm", [
+      "install",
+      "--ignore-scripts",
+      "--registry=https://registry.npmjs.org/",
+    ], {
       cwd: consumer,
       encoding: "utf8",
       env: { ...process.env, npm_config_update_notifier: "false" },
     });
     assert.equal(installed.status, 0, installed.stderr || `npm install failed in ${consumer}`);
+    const probed = spawnSync(process.execPath, [
+      "--input-type=module",
+      "--eval",
+      "const semantic = await import('@openadam/graph-projection/semantic'); if (semantic.SEMANTIC_GRAPH_VERSION !== 1) process.exit(2);",
+    ], {
+      cwd: consumer,
+      encoding: "utf8",
+    });
+    assert.equal(probed.status, 0, probed.stderr || `semantic subpath probe failed in ${consumer}`);
   }
   process.stdout.write(`Synchronized ${filename} (${hash}) to ${consumers.length} consumer(s).\n`);
 } finally {

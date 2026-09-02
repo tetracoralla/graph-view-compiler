@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "nodes": [
+    { "id": "draft", "label": "Draft", "kind": "step" },
+    { "id": "review", "label": "Review", "kind": "step", "ports": [{ "id": "in", "preferredSide": "left" }] }
+  ],
+  "relations": [
+    { "id": "draft-review", "source": "draft", "target": "review", "direction": "directed", "label": "send", "targetPort": "in" }
+  ]
+}

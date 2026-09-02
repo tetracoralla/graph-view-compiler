@@ -37,6 +37,11 @@ try {
       endpointStylesForDirection,
       projectLayeredGraph,
     } from "@openadam/graph-projection";
+    import {
+      SEMANTIC_GRAPH_VERSION,
+      findSemanticPaths,
+      semanticGraphToProjectionGraph,
+    } from "@openadam/graph-projection/semantic";
     const projected = projectLayeredGraph({
       version: GRAPH_PROJECTION_VERSION,
       nodes: [
@@ -49,6 +54,17 @@ try {
     }, { direction: "left-to-right" });
     if (projected.edges.length !== 1) process.exit(2);
     if (endpointStylesForDirection("undirected").target !== "none") process.exit(3);
+    const semantic = {
+      version: SEMANTIC_GRAPH_VERSION,
+      nodes: [{ id: "a" }, { id: "b" }],
+      relations: [{ id: "ab", source: "a", target: "b", direction: "directed" }]
+    };
+    const paths = findSemanticPaths(semantic, { from: "a", to: "b" });
+    if (paths[0]?.relations[0] !== "ab") process.exit(4);
+    const portable = semanticGraphToProjectionGraph(semantic, {
+      nodeSizes: { a: { width: 100, height: 50 }, b: { width: 100, height: 50 } }
+    });
+    if (portable.version !== GRAPH_PROJECTION_VERSION) process.exit(5);
   `);
   const probed = spawnSync(process.execPath, ["probe.mjs"], {
     cwd: consumerDirectory,
@@ -59,7 +75,7 @@ try {
     path.join(consumerDirectory, "node_modules/@openadam/graph-projection/package.json"),
     "utf8",
   ));
-  assert.equal(installedManifest.version, "0.1.0");
+  assert.equal(installedManifest.version, "0.2.0");
   process.stdout.write("Packed install checks passed.\n");
 } finally {
   await rm(workspace, { recursive: true, force: true });

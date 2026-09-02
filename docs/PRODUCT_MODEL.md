@@ -1,10 +1,15 @@
 # Product model
 
 Graph Projection is a deterministic library boundary between a product's
-semantic graph and its renderer.
+authoritative graph and its renderer. It owns a portable semantic interchange
+graph plus renderer-neutral 2D projection; products retain their domain graph
+as source of truth.
 
 ## Owned inputs
 
+- a versioned neutral graph with stable nodes, relations, groups, ports, and
+  explicit relation direction;
+- bounded structural filter, slice, path, group, and collapse options;
 - ordered nodes with stable ids and rectangle dimensions;
 - ordered relations with explicit direction;
 - optional preferred ports, labels, weights, and already positioned nodes;
@@ -13,6 +18,7 @@ semantic graph and its renderer.
 
 ## Owned outputs
 
+- deterministic derived semantic subgraphs and explicit collapse membership;
 - deterministic node rectangles;
 - boundary ports and orthogonal route points;
 - endpoint styles derived from relation direction;

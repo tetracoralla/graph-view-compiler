@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "nodes": [
+    { "id": "question", "label": "Approved?", "kind": "decision" },
+    { "id": "publish", "label": "Publish", "kind": "step" },
+    { "id": "revise", "label": "Revise", "kind": "step" }
+  ],
+  "relations": [
+    { "id": "yes", "source": "question", "target": "publish", "direction": "directed", "label": "yes" },
+    { "id": "no", "source": "question", "target": "revise", "direction": "directed", "label": "no" }
+  ]
+}
