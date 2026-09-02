@@ -65,6 +65,7 @@ export interface CompileGraphViewInput {
   passes?: readonly GraphViewPass[];
   nodeSizes: Readonly<Record<string, { width: number; height: number }>>;
   labelSizes?: Readonly<Record<string, { width: number; height: number }>>;
+  edgeWeights?: Readonly<Record<string, number>>;
   profile: GraphViewProfile;
   routing?: ProjectionRoutingOptions;
   previousPlan?: GraphViewPlanV1;

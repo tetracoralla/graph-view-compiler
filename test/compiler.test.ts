@@ -276,5 +276,15 @@ describe("graph view compiler", () => {
       name: "GraphViewCompileError",
       issues: [expect.objectContaining({ code: "invalid_input", id: "nodeSizes" })],
     }));
+
+    expect(() => compileGraphView({
+      graph: chain,
+      nodeSizes: sizes,
+      edgeWeights: { ab: 0 },
+      profile: { type: "layered", layout: { direction: "left-to-right" } },
+    })).toThrow(expect.objectContaining({
+      name: "GraphViewCompileError",
+      issues: [expect.objectContaining({ code: "invalid_input", id: "edgeWeights" })],
+    }));
   });
 });

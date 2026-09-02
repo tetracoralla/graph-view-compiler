@@ -59,6 +59,9 @@ exists after all passes and for every visible relation label. A collapsed group
 proxy is a derived node and therefore needs its own measured size. Label boxes
 are retained in the view plan and included in bounds and collision diagnostics.
 The compiler never measures fonts, wraps text, or selects product typography.
+Callers may also supply finite positive edge weights as layout hints. Weights
+influence layered placement only; they do not change relation meaning and are
+never added to the semantic graph.
 
 Routing accepts only `stub`, `clearance`, `turnCost`, and
 `maximumObstacles`. Obstacle-aware routing is capped at 96 unrelated nodes per

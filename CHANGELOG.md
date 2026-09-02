@@ -8,6 +8,8 @@
   counts and composed source membership.
 - Add layered and fixed-position profiles with shared ports, orthogonal
   routing, bounds, endpoint semantics, and diagnostics.
+- Keep product-owned label measurements and non-semantic edge weights explicit
+  at the compiler boundary.
 - Add prior-plan change reconciliation and explicit retained-anchor alignment
   for layered views.
 - Bound routing options, quadratic geometric inspection, and returned

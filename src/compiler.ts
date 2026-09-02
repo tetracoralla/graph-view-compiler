@@ -277,6 +277,12 @@ function validSizes(value: unknown): boolean {
   );
 }
 
+function validEdgeWeights(value: unknown): boolean {
+  return isRecord(value) && Object.values(value).every((weight) =>
+    typeof weight === "number" && Number.isFinite(weight) && weight > 0,
+  );
+}
+
 function sanitizedRouting(value: ProjectionRoutingOptions | undefined): ProjectionRoutingOptions {
   if (value === undefined) return {};
   return {
@@ -561,6 +567,13 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
       "labelSizes must contain finite positive width and height values",
     ));
   }
+  if (candidate.edgeWeights !== undefined && !validEdgeWeights(candidate.edgeWeights)) {
+    problems.push(issue(
+      "invalid_input",
+      "edgeWeights",
+      "edgeWeights must contain finite positive numbers",
+    ));
+  }
   if (problems.length > 0) throw new GraphViewCompileError(problems);
 
   const passes = (input.passes ?? []) as readonly GraphViewPass[];
@@ -573,10 +586,19 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
       `Missing measured label size for relation ${relation.id}`,
     ));
   if (missingLabelSizes.length > 0) throw new GraphViewCompileError(missingLabelSizes);
-  const projection = semanticGraphToProjectionGraph(compiled.graph, {
+  const projectionBase = semanticGraphToProjectionGraph(compiled.graph, {
     nodeSizes: input.nodeSizes,
     ...(input.labelSizes === undefined ? {} : { labelSizes: input.labelSizes }),
   });
+  const projection = {
+    ...projectionBase,
+    edges: projectionBase.edges.map((edge) => ({
+      ...edge,
+      ...(input.edgeWeights?.[edge.id] === undefined
+        ? {}
+        : { weight: input.edgeWeights[edge.id] }),
+    })),
+  };
   const routing = sanitizedRouting(input.routing);
   const layout = input.profile.type === "layered"
     ? sanitizedLayout(input.profile.layout)
