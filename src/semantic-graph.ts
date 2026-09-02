@@ -189,7 +189,8 @@ export function validateSemanticGraph(value: unknown): readonly SemanticGraphIss
     for (const [portIndex, port] of (candidate.ports ?? []).entries()) {
       if (!isRecord(port) || !validIdentifier(port.id) || !optionalText(port.kind) ||
           (port.preferredSide !== undefined &&
-            !["top", "right", "bottom", "left"].includes(String(port.preferredSide)))) {
+            (typeof port.preferredSide !== "string" ||
+              !["top", "right", "bottom", "left"].includes(port.preferredSide)))) {
         issues.push(issue("invalid_identifier", `${candidate.id}.ports[${portIndex}]`, `Invalid port on node ${candidate.id}`));
         continue;
       }
@@ -405,6 +406,19 @@ function checkedDepth(value: number | undefined, fallback: number): number {
   return depth;
 }
 
+function checkedDirection(
+  value: unknown,
+  fallback?: "outgoing" | "incoming" | "both",
+): "outgoing" | "incoming" | "both" {
+  const direction = value ?? fallback;
+  if (direction !== "outgoing" && direction !== "incoming" && direction !== "both") {
+    throw new SemanticGraphError([
+      issue("invalid_option", "direction", `direction must be "outgoing", "incoming", or "both"`),
+    ]);
+  }
+  return direction;
+}
+
 export function sliceSemanticGraph(
   graph: SemanticGraphV1,
   options: SemanticGraphSlice,
@@ -417,7 +431,8 @@ export function sliceSemanticGraph(
   }
   if (problems.length > 0) throw new SemanticGraphError(problems);
   const maxDepth = checkedDepth(options.maxDepth, MAX_TRAVERSAL_DEPTH);
-  const adjacency = adjacencyFor(normalized, options.direction);
+  const direction = checkedDirection(options.direction);
+  const adjacency = adjacencyFor(normalized, direction);
   const selected = new Set(options.focus);
   const pending = [...new Set(options.focus)].sort(compareGraphIds).map((id) => ({ id, depth: 0 }));
   for (let cursor = 0; cursor < pending.length; cursor += 1) {
@@ -448,7 +463,8 @@ export function findSemanticPaths(
     ]);
   }
   if (query.from === query.to) return [{ nodes: [query.from], relations: [] }];
-  const adjacency = adjacencyFor(normalized, query.direction ?? "outgoing");
+  const direction = checkedDirection(query.direction, "outgoing");
+  const adjacency = adjacencyFor(normalized, direction);
   const found: SemanticPath[] = [];
   let exploredStates = 0;
   const stack: Array<{ nodeId: string; nodes: string[]; relations: string[]; visited: Set<string> }> = [{
@@ -548,6 +564,7 @@ export function collapseSemanticGroups(
       graph: normalized,
       nodeMembers: Object.fromEntries(normalized.nodes.map((node) => [node.id, [node.id]])),
       relationMembers: Object.fromEntries(normalized.relations.map((relation) => [relation.id, [relation.id]])),
+      absorbedRelationIds: [],
     };
   }
   const groupById = new Map(groups.map((group) => [group.id, group]));
@@ -579,10 +596,14 @@ export function collapseSemanticGroups(
   }
   const relations: SemanticRelation[] = [];
   const relationMembers: Record<string, string[]> = {};
+  const absorbedRelationIds: string[] = [];
   for (const relation of normalized.relations) {
     const source = proxyByNode.get(relation.source) ?? relation.source;
     const target = proxyByNode.get(relation.target) ?? relation.target;
-    if (source === target) continue;
+    if (source === target) {
+      absorbedRelationIds.push(relation.id);
+      continue;
+    }
     const {
       sourcePort: _sourcePort,
       targetPort: _targetPort,
@@ -614,7 +635,8 @@ export function collapseSemanticGroups(
     ...(remainingGroups.length === 0 ? {} : { groups: remainingGroups }),
   });
   for (const members of Object.values(nodeMembers)) members.sort(compareGraphIds);
-  return { graph: collapsed, nodeMembers, relationMembers };
+  absorbedRelationIds.sort(compareGraphIds);
+  return { graph: collapsed, nodeMembers, relationMembers, absorbedRelationIds };
 }
 
 export function semanticGraphToProjectionGraph(

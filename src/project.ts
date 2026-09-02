@@ -1,6 +1,7 @@
 import { layoutLayeredGraph } from "./layered.js";
 import {
   allocateRectanglePorts,
+  pointOnRoute,
   roundedOrthogonalPath,
   routeOrthogonalBetweenPorts,
 } from "./routing.js";
@@ -60,25 +61,7 @@ function sanitizedRouting(options: ProjectionRoutingOptions): ProjectionRoutingO
 }
 
 function routeMidpoint(route: OrthogonalRoute): { x: number; y: number } {
-  const lengths = route.points.slice(1).map((point, index) =>
-    Math.hypot(point.x - route.points[index]!.x, point.y - route.points[index]!.y),
-  );
-  const total = lengths.reduce((sum, length) => sum + length, 0);
-  let remaining = total / 2;
-  for (let index = 0; index < lengths.length; index += 1) {
-    const length = lengths[index]!;
-    if (remaining <= length || index === lengths.length - 1) {
-      const source = route.points[index]!;
-      const target = route.points[index + 1]!;
-      const ratio = length === 0 ? 0 : remaining / length;
-      return {
-        x: source.x + (target.x - source.x) * ratio,
-        y: source.y + (target.y - source.y) * ratio,
-      };
-    }
-    remaining -= length;
-  }
-  return route.source;
+  return pointOnRoute(route, 0.5);
 }
 
 function extent(values: readonly number[]): number {

@@ -1,5 +1,8 @@
 import { compareGraphIds } from "./semantic-graph.js";
-import { inspectRoutedGraphDetails } from "./quality.js";
+import {
+  inspectRoutedGraphDetails,
+  segmentIntersectsNode,
+} from "./quality.js";
 import {
   MAX_GRAPH_VIEW_INSPECTION_WORK,
   type Point,
@@ -36,24 +39,6 @@ function boxesOverlap(left: Box, right: Box): boolean {
     left.x + left.width > right.x + EPSILON &&
     left.y < right.y + right.height - EPSILON &&
     left.y + left.height > right.y + EPSILON;
-}
-
-function segmentIntersectsBox(source: Point, target: Point, box: Box): boolean {
-  const left = box.x;
-  const right = box.x + box.width;
-  const top = box.y;
-  const bottom = box.y + box.height;
-  if (Math.abs(source.x - target.x) < EPSILON) {
-    return source.x > left + EPSILON && source.x < right - EPSILON &&
-      Math.max(source.y, target.y) > top + EPSILON &&
-      Math.min(source.y, target.y) < bottom - EPSILON;
-  }
-  if (Math.abs(source.y - target.y) < EPSILON) {
-    return source.y > top + EPSILON && source.y < bottom - EPSILON &&
-      Math.max(source.x, target.x) > left + EPSILON &&
-      Math.min(source.x, target.x) < right - EPSILON;
-  }
-  return true;
 }
 
 function diagnosticKey(diagnostic: ViewInspectionDiagnostic): string {
@@ -153,7 +138,7 @@ export function inspectCompiledView(
     for (const edge of edges) {
       if (edge.id === label.id) continue;
       if (!edge.route.points.slice(1).some((point, index) =>
-        segmentIntersectsBox(edge.route.points[index]!, point, label),
+        segmentIntersectsNode(edge.route.points[index]!, point, label),
       )) continue;
       labelEdgeIntersections += 1;
       const viewIds = [label.id, edge.id].sort(compareGraphIds);

@@ -112,7 +112,7 @@ export function choosePorts(
   preferredSource?: PortSide,
   preferredTarget?: PortSide,
 ): { sourcePort: PortSide; targetPort: PortSide } {
-  const automaticSource = sideToward(source, center(target), 1);
+  const automaticSource = sideToward(source, center(target));
   const sourcePort = preferredSource ?? automaticSource;
   return {
     sourcePort,
@@ -369,40 +369,78 @@ function obstacleAvoidingPoints(
     targetStub.y,
     ...obstacles.flatMap((obstacle) => [obstacle.top, obstacle.bottom]),
   ]);
+  // A segment or grid point on a line can only interact with obstacles whose
+  // perpendicular interval contains that line, so pre-filter per candidate
+  // line instead of scanning every obstacle everywhere.
+  const obstaclesOnVerticalLine = new Map<number, ExpandedObstacle[]>();
+  const obstaclesOnHorizontalLine = new Map<number, ExpandedObstacle[]>();
+  for (const x of xs) {
+    obstaclesOnVerticalLine.set(x, obstacles.filter((obstacle) =>
+      x > obstacle.left + EPSILON && x < obstacle.right - EPSILON,
+    ));
+  }
+  for (const y of ys) {
+    obstaclesOnHorizontalLine.set(y, obstacles.filter((obstacle) =>
+      y > obstacle.top + EPSILON && y < obstacle.bottom - EPSILON,
+    ));
+  }
+  const ysLength = ys.length;
+  const cellIndexes = new Array<number | undefined>(xs.length * ysLength);
   const points: Point[] = [];
-  const indexes = new Map<string, number>();
-  const key = (point: Point) => `${point.x.toFixed(3)}:${point.y.toFixed(3)}`;
-  xs.forEach((x) => ys.forEach((y) => {
-    const point = { x, y };
-    if (obstacles.some((obstacle) => pointInsideObstacle(point, obstacle))) return;
-    indexes.set(key(point), points.length);
-    points.push(point);
-  }));
-  const sourceIndex = indexes.get(key(sourceStub));
-  const targetIndex = indexes.get(key(targetStub));
+  xs.forEach((x, xIndex) => {
+    const column = obstaclesOnVerticalLine.get(x) ?? [];
+    ys.forEach((y, yIndex) => {
+      const row = obstaclesOnHorizontalLine.get(y) ?? [];
+      const relevant = column.length <= row.length
+        ? column.filter((obstacle) => row.includes(obstacle))
+        : row.filter((obstacle) => column.includes(obstacle));
+      const point = { x, y };
+      if (relevant.some((obstacle) => pointInsideObstacle(point, obstacle))) return;
+      cellIndexes[xIndex * ysLength + yIndex] = points.length;
+      points.push(point);
+    });
+  });
+  const cellOf = (point: Point): number | undefined => {
+    const xIndex = xs.indexOf(Number(point.x.toFixed(3)));
+    const yIndex = ys.indexOf(Number(point.y.toFixed(3)));
+    if (xIndex < 0 || yIndex < 0) return undefined;
+    return cellIndexes[xIndex * ysLength + yIndex];
+  };
+  const sourceIndex = cellOf(sourceStub);
+  const targetIndex = cellOf(targetStub);
   if (sourceIndex === undefined || targetIndex === undefined) return undefined;
 
   const adjacency = new Map<number, number[]>();
-  const connect = (left: number, right: number) => {
+  const connect = (left: number, right: number, relevant: readonly ExpandedObstacle[]) => {
     const leftPoint = points[left];
     const rightPoint = points[right];
-    if (!leftPoint || !rightPoint || !segmentClear(leftPoint, rightPoint, obstacles)) return;
-    adjacency.set(left, [...(adjacency.get(left) ?? []), right]);
-    adjacency.set(right, [...(adjacency.get(right) ?? []), left]);
+    if (!leftPoint || !rightPoint || !segmentClear(leftPoint, rightPoint, relevant)) return;
+    const leftNeighbors = adjacency.get(left);
+    if (leftNeighbors === undefined) adjacency.set(left, [right]);
+    else leftNeighbors.push(right);
+    const rightNeighbors = adjacency.get(right);
+    if (rightNeighbors === undefined) adjacency.set(right, [left]);
+    else rightNeighbors.push(left);
   };
-  xs.forEach((x) => {
-    const line = ys.flatMap((y) => {
-      const index = indexes.get(key({ x, y }));
-      return index === undefined ? [] : [index];
-    });
-    line.slice(0, -1).forEach((index, offset) => connect(index, line[offset + 1]!));
+  xs.forEach((x, xIndex) => {
+    const relevant = obstaclesOnVerticalLine.get(x) ?? [];
+    let previous: number | undefined;
+    for (let yIndex = 0; yIndex < ysLength; yIndex += 1) {
+      const index = cellIndexes[xIndex * ysLength + yIndex];
+      if (index === undefined) continue;
+      if (previous !== undefined) connect(previous, index, relevant);
+      previous = index;
+    }
   });
-  ys.forEach((y) => {
-    const line = xs.flatMap((x) => {
-      const index = indexes.get(key({ x, y }));
-      return index === undefined ? [] : [index];
-    });
-    line.slice(0, -1).forEach((index, offset) => connect(index, line[offset + 1]!));
+  ys.forEach((y, yIndex) => {
+    const relevant = obstaclesOnHorizontalLine.get(y) ?? [];
+    let previous: number | undefined;
+    for (let xIndex = 0; xIndex < xs.length; xIndex += 1) {
+      const index = cellIndexes[xIndex * ysLength + yIndex];
+      if (index === undefined) continue;
+      if (previous !== undefined) connect(previous, index, relevant);
+      previous = index;
+    }
   });
 
   type Axis = "horizontal" | "vertical" | "none";
@@ -410,19 +448,59 @@ function obstacleAvoidingPoints(
     cost: number;
     axis: Axis;
     point: number;
-    previous?: string;
+    previous?: number;
   }
-  const stateKey = (point: number, axis: Axis) => `${point}:${axis}`;
-  const best = new Map<string, SearchState>();
+  // Numeric state keys numbered in code-point order of the axis names, so
+  // (cost, point, axis) remains the deterministic total order the heap pops in.
+  const axisCode: Record<Axis, number> = { horizontal: 0, none: 1, vertical: 2 };
+  const stateKey = (point: number, axis: Axis) => point * 3 + axisCode[axis];
+  const statePrecedes = (left: SearchState, right: SearchState): boolean =>
+    left.cost < right.cost ||
+    (left.cost === right.cost &&
+      (left.point < right.point ||
+        (left.point === right.point && compareGraphIds(left.axis, right.axis) < 0)));
+  const heap: SearchState[] = [];
+  const heapPush = (state: SearchState) => {
+    heap.push(state);
+    let index = heap.length - 1;
+    while (index > 0) {
+      const parent = (index - 1) >> 1;
+      if (!statePrecedes(heap[index]!, heap[parent]!)) break;
+      const temporary = heap[index]!;
+      heap[index] = heap[parent]!;
+      heap[parent] = temporary;
+      index = parent;
+    }
+  };
+  const heapPop = (): SearchState | undefined => {
+    const top = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0 && last !== undefined) {
+      heap[0] = last;
+      let index = 0;
+      for (;;) {
+        const left = index * 2 + 1;
+        const right = left + 1;
+        let smallest = index;
+        if (left < heap.length && statePrecedes(heap[left]!, heap[smallest]!)) smallest = left;
+        if (right < heap.length && statePrecedes(heap[right]!, heap[smallest]!)) smallest = right;
+        if (smallest === index) break;
+        const temporary = heap[index]!;
+        heap[index] = heap[smallest]!;
+        heap[smallest] = temporary;
+        index = smallest;
+      }
+    }
+    return top;
+  };
+  const best = new Map<number, SearchState>();
   const first: SearchState = { cost: 0, axis: "none", point: sourceIndex };
-  const pending = [first];
   best.set(stateKey(sourceIndex, "none"), first);
+  heapPush(first);
   let resolved: SearchState | undefined;
-  while (pending.length > 0) {
-    pending.sort((left, right) =>
-      left.cost - right.cost || left.point - right.point || compareGraphIds(left.axis, right.axis),
-    );
-    const current = pending.shift()!;
+  while (heap.length > 0) {
+    const current = heapPop();
+    if (current === undefined) continue;
     if (best.get(stateKey(current.point, current.axis)) !== current) continue;
     if (current.point === targetIndex) {
       resolved = current;
@@ -446,7 +524,7 @@ function obstacleAvoidingPoints(
         previous: stateKey(current.point, current.axis),
       };
       best.set(nextKey, next);
-      pending.push(next);
+      heapPush(next);
     }
   }
   if (!resolved) return undefined;
@@ -454,7 +532,7 @@ function obstacleAvoidingPoints(
   let current: SearchState | undefined = resolved;
   while (current) {
     result.push(points[current.point]!);
-    current = current.previous ? best.get(current.previous) : undefined;
+    current = current.previous === undefined ? undefined : best.get(current.previous);
   }
   result.reverse();
   return compactOrthogonalPoints([source, ...result, target]);
@@ -487,7 +565,7 @@ export function routeOrthogonalBetweenPorts(
     node.id !== sourceNode.id && node.id !== targetNode.id,
   );
   const stub = options.stub ?? 30;
-  const points = obstacleAvoidingPoints(
+  const avoiding = obstacleAvoidingPoints(
     source,
     target,
     source.side,
@@ -497,13 +575,15 @@ export function routeOrthogonalBetweenPorts(
     options.clearance ?? 14,
     options.turnCost ?? 28,
     options.maximumObstacles ?? 40,
-  ) ?? simpleOrthogonalPoints(source, target, source.side, target.side, stub);
+  );
+  const points = avoiding ?? simpleOrthogonalPoints(source, target, source.side, target.side, stub);
   return {
     source,
     target,
     sourcePort: source.side,
     targetPort: target.side,
     points,
+    strategy: avoiding === undefined ? "simple" : "obstacle-avoiding",
   };
 }
 

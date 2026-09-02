@@ -4,6 +4,7 @@ import {
   MAX_GRAPH_VIEW_PASSES,
   compileGraphView,
   type CompileGraphViewInput,
+  type GraphViewPlanV1,
   type SemanticGraphV1,
 } from "../src/index.js";
 
@@ -227,6 +228,133 @@ describe("graph view compiler", () => {
     expect(plan.quality).toEqual(expect.objectContaining({ complete: false, edgeCrossings: null }));
     expect(plan.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "inspection_limit", viewIds: [] }),
+    ]));
+  });
+
+  it("rejects malformed pass options during validation instead of mid-pipeline", () => {
+    const base = {
+      graph: chain,
+      nodeSizes: sizes,
+      profile: {
+        type: "fixed" as const,
+        positions: { a: { x: 0, y: 0 }, b: { x: 200, y: 0 }, c: { x: 400, y: 0 } },
+      },
+    };
+    expect(() => compileGraphView({
+      ...base,
+      passes: [{
+        id: "slice",
+        type: "slice",
+        slice: { focus: ["a"], direction: ["incoming"] as unknown as "incoming" },
+      }],
+    })).toThrow(expect.objectContaining({
+      name: "GraphViewCompileError",
+      issues: [expect.objectContaining({ code: "invalid_pass", id: "slice" })],
+    }));
+    expect(() => compileGraphView({
+      ...base,
+      passes: [{
+        id: "slice",
+        type: "slice",
+        slice: { focus: ["a"], direction: "outgoing", maxDepth: 99_999 },
+      }],
+    })).toThrow(expect.objectContaining({
+      name: "GraphViewCompileError",
+      issues: [expect.objectContaining({ code: "invalid_pass", id: "slice" })],
+    }));
+    expect(() => compileGraphView({
+      ...base,
+      passes: [{ id: "slice", type: "slice", slice: { focus: [], direction: "outgoing" } }],
+    })).toThrow(expect.objectContaining({
+      name: "GraphViewCompileError",
+      issues: [expect.objectContaining({ code: "invalid_pass", id: "slice" })],
+    }));
+  });
+
+  it("reports missing node sizes as compile input issues", () => {
+    expect(() => compileGraphView({
+      graph: chain,
+      nodeSizes: { a: { width: 100, height: 50 }, b: { width: 100, height: 50 } },
+      profile: { type: "layered", layout: { direction: "left-to-right" } },
+    })).toThrow(expect.objectContaining({
+      name: "GraphViewCompileError",
+      issues: [expect.objectContaining({ code: "invalid_input", id: "c" })],
+    }));
+  });
+
+  it("rejects unknown stability keys and fixed-profile anchoring during validation", () => {
+    expect(() => compileGraphView({
+      graph: chain,
+      nodeSizes: sizes,
+      profile: { type: "layered", layout: { direction: "left-to-right" } },
+      stability: { mode: "none", junk: 1 },
+    } as unknown as CompileGraphViewInput)).toThrow(expect.objectContaining({
+      name: "GraphViewCompileError",
+      issues: [expect.objectContaining({ code: "invalid_input", id: "stability" })],
+    }));
+    const previousPlan = compileGraphView({
+      graph: chain,
+      nodeSizes: sizes,
+      profile: { type: "layered", layout: { direction: "left-to-right" } },
+    });
+    expect(() => compileGraphView({
+      graph: chain,
+      nodeSizes: sizes,
+      profile: {
+        type: "fixed",
+        positions: { a: { x: 0, y: 0 }, b: { x: 200, y: 0 }, c: { x: 400, y: 0 } },
+      },
+      previousPlan,
+      stability: { mode: "preserve-anchor", anchorNodeId: "a" },
+    })).toThrow(expect.objectContaining({
+      name: "GraphViewCompileError",
+      issues: [expect.objectContaining({ code: "invalid_profile", id: "stability" })],
+    }));
+  });
+
+  it("rejects previous plans whose nodes lack dimensions", () => {
+    const previousPlan = compileGraphView({
+      graph: chain,
+      nodeSizes: sizes,
+      profile: { type: "layered", layout: { direction: "left-to-right" } },
+    });
+    const stripped = JSON.parse(JSON.stringify(previousPlan)) as GraphViewPlanV1;
+    for (const node of stripped.nodes) {
+      delete (node as { width?: number }).width;
+    }
+    expect(() => compileGraphView({
+      graph: chain,
+      nodeSizes: sizes,
+      profile: { type: "layered", layout: { direction: "left-to-right" } },
+      previousPlan: stripped,
+      stability: { mode: "preserve-anchor", anchorNodeId: "a" },
+    })).toThrow(expect.objectContaining({
+      name: "GraphViewCompileError",
+      issues: [expect.objectContaining({ code: "invalid_previous_plan" })],
+    }));
+  });
+
+  it("reports per-edge fallback when no obstacle-avoiding corridor exists", () => {
+    const graph: SemanticGraphV1 = {
+      version: 1,
+      nodes: [{ id: "a" }, { id: "b" }, { id: "blocker" }],
+      relations: [{ id: "ab", source: "a", target: "b", direction: "directed" }],
+    };
+    const plan = compileGraphView({
+      graph,
+      nodeSizes: {
+        a: { width: 100, height: 50 },
+        b: { width: 100, height: 50 },
+        blocker: { width: 60, height: 30 },
+      },
+      profile: {
+        type: "fixed",
+        positions: { a: { x: 0, y: 0 }, b: { x: 300, y: 0 }, blocker: { x: 120, y: 10 } },
+      },
+    });
+    expect(plan.edges.find((edge) => edge.id === "ab")?.route.strategy).toBe("simple");
+    expect(plan.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "routing_fallback", viewIds: ["ab"] }),
     ]));
   });
 

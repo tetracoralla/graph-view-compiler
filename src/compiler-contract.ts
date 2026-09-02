@@ -140,6 +140,7 @@ export interface GraphViewDiagnostic {
     | "label_edge_intersection"
     | "label_overlap"
     | "routing_obstacle_limit"
+    | "routing_fallback"
     | "inspection_limit"
     | "diagnostic_limit";
   severity: "warning";

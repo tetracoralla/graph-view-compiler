@@ -25,7 +25,7 @@ function segmentsCross(
   return first * second < -EPSILON && third * fourth < -EPSILON;
 }
 
-function segmentIntersectsNode(source: Point, target: Point, node: NodeBox): boolean {
+export function segmentIntersectsNode(source: Point, target: Point, node: NodeBox): boolean {
   const left = node.x;
   const right = node.x + node.width;
   const top = node.y;

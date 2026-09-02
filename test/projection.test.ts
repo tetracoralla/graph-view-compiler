@@ -25,7 +25,9 @@ import {
   validateSemanticGraph,
   type NodeBox,
   type RoutedEdge,
+  type SemanticGraphSlice,
   type SemanticGraphV1,
+  type SemanticPathQuery,
 } from "../src/index.js";
 
 const semanticGraph = {
@@ -109,6 +111,31 @@ describe("versioned semantic graph", () => {
     }]);
   });
 
+  it("rejects traversal directions and port sides that are not exact literals", () => {
+    expect(() => findSemanticPaths(semanticGraph, {
+      from: "schema",
+      to: "publish",
+      direction: "sideways",
+    } as unknown as SemanticPathQuery)).toThrow(expect.objectContaining({
+      name: "SemanticGraphError",
+      issues: [expect.objectContaining({ code: "invalid_option", id: "direction" })],
+    }));
+    expect(() => sliceSemanticGraph(semanticGraph, {
+      focus: ["build"],
+      direction: ["outgoing"],
+    } as unknown as SemanticGraphSlice)).toThrow(expect.objectContaining({
+      name: "SemanticGraphError",
+      issues: [expect.objectContaining({ code: "invalid_option", id: "direction" })],
+    }));
+    expect(validateSemanticGraph({
+      version: 1,
+      nodes: [{ id: "a", ports: [{ id: "p", preferredSide: ["top"] }] }],
+      relations: [],
+    } as unknown as SemanticGraphV1)).toEqual([
+      expect.objectContaining({ code: "invalid_identifier", id: "a.ports[0]" }),
+    ]);
+  });
+
   it("fails explicitly when path exploration exceeds its deterministic work budget", () => {
     const connectedNodeCount = 20;
     const graph = {
@@ -162,6 +189,8 @@ describe("versioned semantic graph", () => {
     ]);
     expect(collapsed.nodeMembers.pair).toEqual(["a", "b"]);
     expect(collapsed.relationMembers.bc).toEqual(["bc"]);
+    expect(collapsed.absorbedRelationIds).toEqual(["ab"]);
+    expect(collapseSemanticGroups(grouped, []).absorbedRelationIds).toEqual([]);
   });
 
   it("maps semantic port intent and measured sizes into the 2D projection boundary", () => {
@@ -261,9 +290,14 @@ describe("ports and routing", () => {
       height: 114,
     };
     const route = routeOrthogonal(left, right, { obstacles: [left, obstacle, right] });
+    expect(route.strategy).toBe("obstacle-avoiding");
     expect(route.points.some((point) =>
       point.y <= obstacle.y - 14 || point.y >= obstacle.y + obstacle.height + 14,
     )).toBe(true);
+    expect(routeOrthogonal(left, right, {
+      obstacles: [left, obstacle, right],
+      maximumObstacles: 0,
+    }).strategy).toBe("simple");
     expect(inspectRoutedGraph([left, obstacle, right], [{
       id: "edge",
       sourceId: left.id,

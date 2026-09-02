@@ -86,6 +86,10 @@ export interface SemanticGraphIssue {
 export interface SemanticGraphFilter {
   nodeIds?: readonly string[];
   groupIds?: readonly string[];
+  /**
+   * Matched against relation.kind. Relations without a kind survive only
+   * when "" is listed explicitly.
+   */
   relationKinds?: readonly string[];
 }
 
@@ -117,6 +121,11 @@ export interface CollapsedSemanticGraph {
   graph: SemanticGraphV1;
   nodeMembers: Readonly<Record<string, readonly string[]>>;
   relationMembers: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Source relations whose endpoints collapsed into one proxy node and
+   * therefore have no surviving edge in the collapsed graph.
+   */
+  absorbedRelationIds: readonly string[];
 }
 
 export interface SemanticProjectionOptions {
@@ -179,6 +188,8 @@ export interface OrthogonalRoute {
   sourcePort: PortSide;
   targetPort: PortSide;
   points: Point[];
+  /** Set by this library: whether obstacle-aware routing produced the geometry. */
+  strategy?: "obstacle-avoiding" | "simple";
 }
 
 export interface RouteJump extends Point {

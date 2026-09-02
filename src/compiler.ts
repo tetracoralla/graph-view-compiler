@@ -22,6 +22,7 @@ import {
   MAX_GRAPH_VIEW_ROUTING_OBSTACLES,
   MAX_PROJECTION_EDGES,
   MAX_PROJECTION_NODES,
+  MAX_SEMANTIC_NODES,
   type LayeredLayoutOptions,
   type NodeBox,
   type Point,
@@ -89,9 +90,12 @@ function validFilter(value: unknown): boolean {
 
 function validSlice(value: unknown): boolean {
   return isRecord(value) && hasOnlyKeys(value, ["focus", "direction", "maxDepth"]) &&
-    isStringArray(value.focus) &&
-    ["outgoing", "incoming", "both"].includes(String(value.direction)) &&
-    (value.maxDepth === undefined || Number.isInteger(value.maxDepth));
+    isStringArray(value.focus) && value.focus.length > 0 &&
+    typeof value.direction === "string" &&
+    ["outgoing", "incoming", "both"].includes(value.direction) &&
+    (value.maxDepth === undefined || (typeof value.maxDepth === "number" &&
+      Number.isInteger(value.maxDepth) &&
+      value.maxDepth >= 0 && value.maxDepth <= MAX_SEMANTIC_NODES));
 }
 
 function validAssignment(value: unknown): boolean {
@@ -157,7 +161,8 @@ function validateProfile(value: unknown): readonly GraphViewCompileIssue[] {
   if (value.type === "layered") {
     if (!hasOnlyKeys(value, ["type", "layout"]) || !isRecord(value.layout) ||
         !hasOnlyKeys(value.layout, ["direction", "nodeGap", "edgeGap", "rankGap", "marginX", "marginY"]) ||
-        !["left-to-right", "top-to-bottom"].includes(String(value.layout.direction)) ||
+        typeof value.layout.direction !== "string" ||
+        !["left-to-right", "top-to-bottom"].includes(value.layout.direction) ||
         !optionalNonnegative(value.layout.nodeGap) ||
         !optionalNonnegative(value.layout.edgeGap) ||
         !optionalNonnegative(value.layout.rankGap) ||
@@ -214,8 +219,16 @@ function validateStability(
   value: unknown,
   previousPlan: unknown,
 ): readonly GraphViewCompileIssue[] {
-  if (value === undefined || isRecord(value) && value.mode === "none") return [];
-  if (!isRecord(value) || value.mode !== "preserve-anchor" ||
+  if (value === undefined) return [];
+  if (!isRecord(value)) {
+    return [issue("invalid_input", "stability", "Unsupported graph view stability options")];
+  }
+  if (value.mode === "none") {
+    return hasOnlyKeys(value, ["mode"])
+      ? []
+      : [issue("invalid_input", "stability", "Unsupported graph view stability options")];
+  }
+  if (value.mode !== "preserve-anchor" || !hasOnlyKeys(value, ["mode", "anchorNodeId"]) ||
       (value.anchorNodeId !== undefined && !isIdentifier(value.anchorNodeId))) {
     return [issue("invalid_input", "stability", "Unsupported graph view stability options")];
   }
@@ -249,7 +262,9 @@ function validatePreviousPlan(value: unknown): readonly GraphViewCompileIssue[] 
   const nodeIds = value.nodes.map((node) =>
     isRecord(node) && isIdentifier(node.id) &&
       typeof node.x === "number" && Number.isFinite(node.x) &&
-      typeof node.y === "number" && Number.isFinite(node.y)
+      typeof node.y === "number" && Number.isFinite(node.y) &&
+      typeof node.width === "number" && Number.isFinite(node.width) && node.width > 0 &&
+      typeof node.height === "number" && Number.isFinite(node.height) && node.height > 0
       ? node.id
       : null,
   );
@@ -574,6 +589,14 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
       "edgeWeights must contain finite positive numbers",
     ));
   }
+  if (isRecord(candidate.profile) && candidate.profile.type === "fixed" &&
+      isRecord(candidate.stability) && candidate.stability.mode === "preserve-anchor") {
+    problems.push(issue(
+      "invalid_profile",
+      "stability",
+      "Fixed-position views already use authoritative positions and cannot be anchor-aligned",
+    ));
+  }
   if (problems.length > 0) throw new GraphViewCompileError(problems);
 
   const passes = (input.passes ?? []) as readonly GraphViewPass[];
@@ -586,6 +609,14 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
       `Missing measured label size for relation ${relation.id}`,
     ));
   if (missingLabelSizes.length > 0) throw new GraphViewCompileError(missingLabelSizes);
+  const missingNodeSizes = compiled.graph.nodes
+    .filter((node) => input.nodeSizes[node.id] === undefined)
+    .map((node) => issue(
+      "invalid_input",
+      node.id,
+      `Missing projection size for node ${node.id}`,
+    ));
+  if (missingNodeSizes.length > 0) throw new GraphViewCompileError(missingNodeSizes);
   const projectionBase = semanticGraphToProjectionGraph(compiled.graph, {
     nodeSizes: input.nodeSizes,
     ...(input.labelSizes === undefined ? {} : { labelSizes: input.labelSizes }),
@@ -606,13 +637,6 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
   const projected = input.profile.type === "layered"
     ? projectLayeredGraph(projection, layout!, routing)
     : projectFixedGraph(projection, { positions: input.profile.positions, routing });
-  if (input.profile.type === "fixed" && input.stability?.mode === "preserve-anchor") {
-    throw new GraphViewCompileError([issue(
-      "invalid_profile",
-      "stability",
-      "Fixed-position views already use authoritative positions and cannot be anchor-aligned",
-    )]);
-  }
   const aligned = alignProjectedGraph(
     projected,
     input.previousPlan,
@@ -661,6 +685,17 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
       viewIds: [],
       sourceIds: [],
     });
+  } else {
+    for (const edge of edges) {
+      if (edge.route.strategy !== "simple") continue;
+      diagnostics.push({
+        code: "routing_fallback",
+        severity: "warning",
+        message: `Edge ${edge.id} fell back to simple orthogonal routing because no obstacle-avoiding corridor was found`,
+        viewIds: [edge.id],
+        sourceIds: diagnosticSourceIds(compiled.membership, [edge.id]),
+      });
+    }
   }
   diagnostics.sort((left, right) =>
     compareGraphIds(`${left.code}\0${left.viewIds.join("\0")}`, `${right.code}\0${right.viewIds.join("\0")}`),
