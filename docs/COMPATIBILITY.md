@@ -20,6 +20,11 @@ contract and deterministic graph operations without changing the existing
 `ProjectionGraphV1` geometry boundary. The `/semantic` subpath is the supported
 low-cost entry for consumers that must not load the 2D backend.
 
+The 0.3 line preserves the 0.1 and 0.2 exports. It adds the `/compiler` subpath,
+fixed-position projection, ordered graph passes, versioned view plans, source
+membership, bounded diagnostics, and change reconciliation. Compiler view-plan
+versioning is independent from both npm versioning and `SemanticGraphV1`.
+
 Every release must pass:
 
 1. library typecheck, unit tests, build, legal and payload inventory;

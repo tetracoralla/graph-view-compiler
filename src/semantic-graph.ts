@@ -643,12 +643,16 @@ export function semanticGraphToProjectionGraph(
     edges: normalized.relations.map((relation) => {
       const sourcePort = portSide(relation.source, relation.sourcePort);
       const targetPort = portSide(relation.target, relation.targetPort);
+      const labelSize = options.labelSizes?.[relation.id];
       return {
         id: relation.id,
         source: relation.source,
         target: relation.target,
         direction: relation.direction,
         ...(relation.label === undefined ? {} : { label: relation.label }),
+        ...(labelSize === undefined
+          ? {}
+          : { labelWidth: labelSize.width, labelHeight: labelSize.height }),
         ...(sourcePort === undefined ? {} : { sourcePort }),
         ...(targetPort === undefined ? {} : { targetPort }),
       };

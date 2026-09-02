@@ -7,6 +7,10 @@ export const MAX_SEMANTIC_RELATIONS = 20_000 as const;
 export const MAX_SEMANTIC_GROUPS = 2_000 as const;
 export const MAX_SEMANTIC_PATHS = 256 as const;
 export const MAX_SEMANTIC_PATH_STATES = 10_000 as const;
+export const MAX_GRAPH_VIEW_PASSES = 64 as const;
+export const MAX_GRAPH_VIEW_ROUTING_OBSTACLES = 96 as const;
+export const MAX_GRAPH_VIEW_INSPECTION_WORK = 100_000 as const;
+export const MAX_GRAPH_VIEW_DIAGNOSTICS = 256 as const;
 
 export type RelationDirection = "directed" | "undirected" | "bidirectional";
 export type EndpointStyle = "none" | "arrow" | "dot" | "ring";
@@ -117,6 +121,7 @@ export interface CollapsedSemanticGraph {
 
 export interface SemanticProjectionOptions {
   nodeSizes: Readonly<Record<string, { width: number; height: number }>>;
+  labelSizes?: Readonly<Record<string, { width: number; height: number }>>;
 }
 
 export interface Point {
@@ -144,6 +149,8 @@ export interface ProjectionEdgeInput {
   target: string;
   direction: RelationDirection;
   label?: string;
+  labelWidth?: number;
+  labelHeight?: number;
   sourcePort?: PortSide;
   targetPort?: PortSide;
   weight?: number;
@@ -238,6 +245,8 @@ export interface ProjectionIssue {
     | "duplicate_edge_id"
     | "missing_source"
     | "missing_target"
+    | "missing_position"
+    | "invalid_position"
     | "invalid_dimension"
     | "too_many_nodes"
     | "too_many_edges";

@@ -1,7 +1,7 @@
 {
   "name": "@openadam/graph-projection",
-  "version": "0.2.0",
-  "description": "Versioned semantic graph operations and deterministic renderer-neutral 2D projection for typed products.",
+  "version": "0.3.0",
+  "description": "A deterministic renderer-neutral graph view compiler for typed product graphs.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "openAdam",
@@ -25,6 +25,10 @@
     "./semantic": {
       "types": "./dist/semantic.d.ts",
       "import": "./dist/semantic.js"
+    },
+    "./compiler": {
+      "types": "./dist/compiler.d.ts",
+      "import": "./dist/compiler.js"
     }
   },
   "files": [
@@ -34,6 +38,10 @@
     "docs/SEMANTIC_GRAPH.md",
     "docs/ENGINE_SELECTION.md",
     "docs/PRODUCT_MODEL.md",
+    "docs/NORTH_STAR.md",
+    "docs/COMPILER.md",
+    "docs/PAIN_CASES.md",
+    "docs/PERFORMANCE.md",
     "CHANGELOG.md",
     "README.md",
     "CONTRIBUTING.md",
@@ -49,6 +57,7 @@
     "check:examples": "node scripts/check-examples.mjs",
     "check:release": "node scripts/check-release.mjs",
     "check:packed-install": "node scripts/check-packed-install.mjs",
+    "measure:compiler": "npm run build && node scripts/measure-compiler.mjs",
     "sync:consumers": "node scripts/sync-consumers.mjs",
     "prepack": "npm run build",
     "check": "npm run typecheck && npm test && npm run build && npm run check:examples && npm run check:release && npm run check:packed-install"

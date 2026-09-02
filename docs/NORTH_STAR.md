@@ -152,9 +152,10 @@ The product has reached a defensible end state when:
 
 ## Current gap from 0.2
 
-The current package implements the semantic graph, bounded core operations,
-layered 2D geometry, routing, and geometric observations. It does not yet expose
-the complete ordered compiler contract, fixed-position profile, change
-reconciliation, bounded measurement contract, backend comparison suite, or an
-unrelated consumer fixture. Those are implementation work, not documentation
+The current 0.3 package implements the semantic graph, bounded core operations,
+ordered compiler contract, layered and fixed-position profiles, shared routing,
+source membership, change reconciliation, anchor alignment, and bounded
+geometric diagnostics. Node dimensions are an explicit caller-owned measurement
+boundary. Backend comparison fixtures and broader browser/build performance
+baselines remain unfinished; those are implementation work, not documentation
 claims.

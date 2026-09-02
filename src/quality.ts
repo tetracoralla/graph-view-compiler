@@ -1,3 +1,4 @@
+import { compareGraphIds } from "./semantic-graph.js";
 import type { NodeBox, Point, RoutedEdge } from "./types.js";
 
 const EPSILON = 0.01;
@@ -49,28 +50,65 @@ export interface ProjectionQuality {
   duplicateEndpointPairs: number;
 }
 
-export function inspectRoutedGraph(
+export interface ProjectionDiagnostic {
+  code:
+    | "edge_crossing"
+    | "edge_node_intersection"
+    | "non_orthogonal_segment"
+    | "duplicate_endpoint_pair";
+  message: string;
+  viewIds: readonly string[];
+}
+
+export interface ProjectionInspection {
+  quality: ProjectionQuality;
+  diagnostics: readonly ProjectionDiagnostic[];
+}
+
+function diagnosticKey(diagnostic: ProjectionDiagnostic): string {
+  return `${diagnostic.code}\0${diagnostic.viewIds.join("\0")}`;
+}
+
+export function inspectRoutedGraphDetails(
   nodes: readonly NodeBox[],
   edges: readonly RoutedEdge[],
-): ProjectionQuality {
+): ProjectionInspection {
   let edgeCrossings = 0;
   let edgeNodeIntersections = 0;
   let nonOrthogonalSegments = 0;
-  const endpointPairs = new Map<string, number>();
+  const endpointPairs = new Map<string, string[]>();
+  const diagnostics = new Map<string, ProjectionDiagnostic>();
+  const addDiagnostic = (diagnostic: ProjectionDiagnostic) => {
+    diagnostics.set(diagnosticKey(diagnostic), diagnostic);
+  };
   edges.forEach((edge) => {
     const source = edge.route.points[0];
     const target = edge.route.points.at(-1);
     if (source && target) {
       const key = `${source.x.toFixed(3)}:${source.y.toFixed(3)}>${target.x.toFixed(3)}:${target.y.toFixed(3)}`;
-      endpointPairs.set(key, (endpointPairs.get(key) ?? 0) + 1);
+      endpointPairs.set(key, [...(endpointPairs.get(key) ?? []), edge.id]);
     }
     edge.route.points.slice(1).forEach((point, index) => {
       const previous = edge.route.points[index]!;
       if (Math.abs(previous.x - point.x) >= EPSILON &&
-          Math.abs(previous.y - point.y) >= EPSILON) nonOrthogonalSegments += 1;
+          Math.abs(previous.y - point.y) >= EPSILON) {
+        nonOrthogonalSegments += 1;
+        addDiagnostic({
+          code: "non_orthogonal_segment",
+          message: `Edge ${edge.id} contains a non-orthogonal route segment`,
+          viewIds: [edge.id],
+        });
+      }
       nodes.filter((node) => node.id !== edge.sourceId && node.id !== edge.targetId)
         .forEach((node) => {
-          if (segmentIntersectsNode(previous, point, node)) edgeNodeIntersections += 1;
+          if (!segmentIntersectsNode(previous, point, node)) return;
+          edgeNodeIntersections += 1;
+          const viewIds = [edge.id, node.id].sort(compareGraphIds);
+          addDiagnostic({
+            code: "edge_node_intersection",
+            message: `Edge ${edge.id} intersects node ${node.id}`,
+            viewIds,
+          });
         });
     });
   });
@@ -82,20 +120,48 @@ export function inspectRoutedGraph(
           left.targetId === right.sourceId || left.targetId === right.targetId) continue;
       left.route.points.slice(1).forEach((leftPoint, leftSegment) => {
         right.route.points.slice(1).forEach((rightPoint, rightSegment) => {
-          if (segmentsCross(
+          if (!segmentsCross(
             left.route.points[leftSegment]!,
             leftPoint,
             right.route.points[rightSegment]!,
             rightPoint,
-          )) edgeCrossings += 1;
+          )) return;
+          edgeCrossings += 1;
+          const viewIds = [left.id, right.id].sort(compareGraphIds);
+          addDiagnostic({
+            code: "edge_crossing",
+            message: `Edges ${viewIds[0]} and ${viewIds[1]} cross`,
+            viewIds,
+          });
         });
       });
     }
   }
+  const duplicateEndpointPairs = [...endpointPairs.values()].filter((ids) => ids.length > 1);
+  for (const ids of duplicateEndpointPairs) {
+    const viewIds = [...ids].sort(compareGraphIds);
+    addDiagnostic({
+      code: "duplicate_endpoint_pair",
+      message: `Edges ${viewIds.join(", ")} share the same routed endpoint pair`,
+      viewIds,
+    });
+  }
   return {
-    edgeCrossings,
-    edgeNodeIntersections,
-    nonOrthogonalSegments,
-    duplicateEndpointPairs: [...endpointPairs.values()].filter((count) => count > 1).length,
+    quality: {
+      edgeCrossings,
+      edgeNodeIntersections,
+      nonOrthogonalSegments,
+      duplicateEndpointPairs: duplicateEndpointPairs.length,
+    },
+    diagnostics: [...diagnostics.values()].sort((left, right) =>
+      compareGraphIds(diagnosticKey(left), diagnosticKey(right)),
+    ),
   };
+}
+
+export function inspectRoutedGraph(
+  nodes: readonly NodeBox[],
+  edges: readonly RoutedEdge[],
+): ProjectionQuality {
+  return inspectRoutedGraphDetails(nodes, edges).quality;
 }

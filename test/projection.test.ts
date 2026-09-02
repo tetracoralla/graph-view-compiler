@@ -303,6 +303,19 @@ describe("ports and routing", () => {
     expect(ports.get("z:source")!.y).toBeLessThan(ports.get("ä:source")!.y);
   });
 
+  it("orders supplementary-plane port ids by Unicode code point", () => {
+    const nodes = [
+      left,
+      { id: "target-private", x: 400, y: 100, width: 120, height: 54 },
+      { id: "target-emoji", x: 400, y: 100, width: 120, height: 54 },
+    ];
+    const ports = allocateRectanglePorts(nodes, [
+      { id: "\uE000", source: "left", target: "target-private" },
+      { id: "😀", source: "left", target: "target-emoji" },
+    ]);
+    expect(ports.get("\uE000:source")!.y).toBeLessThan(ports.get("😀:source")!.y);
+  });
+
   it("assigns one bridge owner at an unrelated crossing", () => {
     const top: NodeBox = { id: "top", x: 202, y: -120, width: 196, height: 54 };
     const bottom: NodeBox = { id: "bottom", x: 202, y: 300, width: 196, height: 54 };

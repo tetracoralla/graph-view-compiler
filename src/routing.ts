@@ -7,12 +7,9 @@ import type {
   RouteJump,
   RoutedEdge,
 } from "./types.js";
+import { compareGraphIds } from "./semantic-graph.js";
 
 const EPSILON = 0.01;
-
-function compareCodePoints(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
 
 export interface AllocatePortEdge {
   id: string;
@@ -169,7 +166,7 @@ export function allocateRectanglePorts(
       const delta = vertical
         ? left.other.y - right.other.y
         : left.other.x - right.other.x;
-      return Math.abs(delta) > EPSILON ? delta : compareCodePoints(left.key, right.key);
+      return Math.abs(delta) > EPSILON ? delta : compareGraphIds(left.key, right.key);
     });
     const length = vertical ? first.node.height : first.node.width;
     const span = group.length === 1
@@ -423,7 +420,7 @@ function obstacleAvoidingPoints(
   let resolved: SearchState | undefined;
   while (pending.length > 0) {
     pending.sort((left, right) =>
-      left.cost - right.cost || left.point - right.point || compareCodePoints(left.axis, right.axis),
+      left.cost - right.cost || left.point - right.point || compareGraphIds(left.axis, right.axis),
     );
     const current = pending.shift()!;
     if (best.get(stateKey(current.point, current.axis)) !== current) continue;

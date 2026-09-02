@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -71,12 +71,37 @@ try {
     encoding: "utf8",
   });
   assert.equal(probed.status, 0, probed.stderr || "packed import probe failed");
+  await Promise.all([
+    copyFile(
+      "fixtures/independent-consumer/consumer.ts",
+      path.join(consumerDirectory, "consumer.ts"),
+    ),
+    copyFile(
+      "fixtures/independent-consumer/tsconfig.json",
+      path.join(consumerDirectory, "tsconfig.json"),
+    ),
+  ]);
+  const typescript = path.resolve("node_modules/typescript/bin/tsc");
+  const compiled = spawnSync(process.execPath, [typescript, "-p", "tsconfig.json"], {
+    cwd: consumerDirectory,
+    encoding: "utf8",
+  });
+  assert.equal(compiled.status, 0, compiled.stderr || compiled.stdout || "typed consumer compile failed");
+  const consumer = spawnSync(process.execPath, ["dist/consumer.js"], {
+    cwd: consumerDirectory,
+    encoding: "utf8",
+  });
+  assert.equal(consumer.status, 0, consumer.stderr || "typed consumer runtime failed");
+  const consumerResult = JSON.parse(consumer.stdout);
+  assert.equal(consumerResult.version, 1);
+  assert.equal(consumerResult.backend, "dagre-layered-v1");
+  assert.deepEqual(consumerResult.nodeIds, ["client", "contract", "release"]);
   const installedManifest = JSON.parse(await readFile(
     path.join(consumerDirectory, "node_modules/@openadam/graph-projection/package.json"),
     "utf8",
   ));
-  assert.equal(installedManifest.version, "0.2.0");
-  process.stdout.write("Packed install checks passed.\n");
+  assert.equal(installedManifest.version, "0.3.0");
+  process.stdout.write("Packed install and independent typed consumer checks passed.\n");
 } finally {
   await rm(workspace, { recursive: true, force: true });
 }

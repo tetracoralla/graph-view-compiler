@@ -1,6 +1,6 @@
 # Product model
 
-Status: current implemented 0.2 boundary. The owner-confirmed target is defined
+Status: current implemented 0.3 boundary. The owner-confirmed target is defined
 in the [North star](NORTH_STAR.md); target capabilities are not current-release
 claims.
 
@@ -14,10 +14,13 @@ as source of truth.
 - a versioned neutral graph with stable nodes, relations, groups, ports, and
   explicit relation direction;
 - bounded structural filter, slice, path, group, and collapse options;
-- ordered nodes with stable ids and rectangle dimensions;
-- ordered relations with explicit direction;
+- at most 64 explicitly ordered, uniquely named compile passes;
+- ordered nodes with stable ids and product-measured rectangle dimensions;
+- ordered relations with explicit direction and product-measured label boxes
+  when labels are visible;
 - optional preferred ports, labels, weights, and already positioned nodes;
-- bounded layout and routing options;
+- layered or fixed-position projection profile, bounded layout and routing
+  options, and an optional prior view plan for explicit anchor stability;
 - at most 2,000 nodes and 8,000 edges in one portable projection call.
 
 ## Owned outputs
@@ -26,7 +29,10 @@ as source of truth.
 - deterministic node rectangles;
 - boundary ports and orthogonal route points;
 - endpoint styles derived from relation direction;
-- label anchor candidates and geometric quality observations.
+- label anchor candidates and bounded geometric quality observations;
+- ordered pass traces, source membership, exact view bounds, change
+  reconciliation, diagnostics, and explicit alignment information in a
+  versioned renderer-neutral view plan.
 
 Outputs contain no color, font, camera, selection, document revision, Agent
 trace, or business approval.

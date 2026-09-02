@@ -5,3 +5,4 @@ export * from "./layered.js";
 export * from "./routing.js";
 export * from "./project.js";
 export * from "./quality.js";
+export * from "./compiler.js";

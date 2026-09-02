@@ -2,11 +2,14 @@
 
 Deterministic geometry for applications that already own a typed graph.
 
-The package provides two deliberately separate layers:
+The package provides three deliberately separate layers:
 
 - a versioned renderer-neutral semantic graph with deterministic filtering,
   slicing, paths, grouping, and collapse;
 - a deterministic 2D projection boundary for consumer-measured nodes.
+- an ordered graph view compiler that combines named semantic passes, layered
+  or fixed-position projection, source membership, change reconciliation, and
+  bounded quality diagnostics.
 
 The projection layer provides:
 
@@ -29,8 +32,13 @@ traditional graph libraries.
 
 The owner-confirmed target is a broader renderer-neutral
 [graph view compiler](docs/NORTH_STAR.md). That document defines future work and
-explicit non-goals; it must not be read as a claim that the current 0.2 package
-already implements the complete compiler contract.
+explicit non-goals; it must not be read as a claim that the current 0.3 package
+already implements every target capability. The current 0.3 API is described
+by the [compiler contract](docs/COMPILER.md).
+The [user-pain conformance matrix](docs/PAIN_CASES.md) records which recurrent
+integration failures are supported, rejected, or still bounded.
+See the [performance boundary](docs/PERFORMANCE.md) for hard work limits and a
+rerunnable package, cold-import, determinism, and compile-time measurement.
 
 ## Develop
 
@@ -53,17 +61,17 @@ version:
 ```json
 {
   "dependencies": {
-      "@openadam/graph-projection": "0.2.0"
+      "@openadam/graph-projection": "0.3.0"
   }
 }
 ```
 
-Before registry publication, Calligram and Laniakea keep the exact packed
+Before registry publication, Calligram, Laniakea, and Dependency Engine keep the exact packed
 tarball in their own `vendor/` directories so a standalone source checkout can
 run `npm ci`. After changing this package, refresh both consumers with:
 
 ```sh
-npm run sync:consumers -- ../visual-document ../laniakea
+npm run sync:consumers -- ../visual-document ../laniakea ../graph-dependency-solver
 ```
 
 The consumers verify the tarball SHA-256 and installed package version in their

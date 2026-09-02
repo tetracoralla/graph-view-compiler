@@ -8,6 +8,7 @@ const license = await readFile("LICENSE", "utf8");
 const notice = await readFile("NOTICE", "utf8");
 
 assert.equal(manifest.name, "@openadam/graph-projection");
+assert.equal(manifest.version, "0.3.0");
 assert.equal(manifest.private, undefined, "the independently distributable package cannot be private");
 assert.equal(manifest.license, "Apache-2.0");
 assert.equal(manifest.publishConfig?.access, "public");
@@ -31,12 +32,18 @@ for (const required of [
   "dist/index.d.ts",
   "dist/semantic.js",
   "dist/semantic.d.ts",
+  "dist/compiler.js",
+  "dist/compiler.d.ts",
   "examples/calligram.semantic-graph.json",
   "examples/dependency-engine.semantic-graph.json",
   "examples/laniakea.semantic-graph.json",
   "docs/COMPATIBILITY.md",
   "docs/ENGINE_SELECTION.md",
   "docs/PRODUCT_MODEL.md",
+  "docs/NORTH_STAR.md",
+  "docs/COMPILER.md",
+  "docs/PAIN_CASES.md",
+  "docs/PERFORMANCE.md",
   "docs/SEMANTIC_GRAPH.md",
   "CHANGELOG.md",
   "README.md",
@@ -49,7 +56,9 @@ for (const required of [
   assert.equal(files.has(required), true, `${required} is missing from the npm package`);
 }
 assert.equal(
-  [...files].some((path) => path.startsWith("test/") || path.includes("CAMPAIGN_ANCHOR")),
+  [...files].some((path) =>
+    path.startsWith("test/") || path.startsWith("fixtures/") || path.includes("CAMPAIGN_ANCHOR"),
+  ),
   false,
   "tests and campaign state must not ship in the package",
 );

@@ -89,6 +89,16 @@ export function validateProjectionGraph(
       });
     }
     edgeIds.add(edge.id);
+    if ((edge.labelWidth !== undefined &&
+         (!Number.isFinite(edge.labelWidth) || edge.labelWidth <= 0)) ||
+        (edge.labelHeight !== undefined &&
+         (!Number.isFinite(edge.labelHeight) || edge.labelHeight <= 0))) {
+      issues.push({
+        code: "invalid_dimension",
+        id: edge.id,
+        message: `Edge ${edge.id} label dimensions must be finite and positive`,
+      });
+    }
     if (!nodeIds.has(edge.source)) {
       issues.push({
         code: "missing_source",
