@@ -37,17 +37,17 @@ Snapshot date: 2026-09-02. Current source and rerun results remain authoritative
 - Graph Projection 0.3 provides the compiled view contract, conformance cases,
   hard work limits, isolated packed install, unrelated typed consumer, examples,
   and rerunnable compiler measurements.
-- Calligram commit `ef42b00` compiles its real document graph through the layered
-  profile and bundles the compiler into its self-contained CLI, desktop, Web,
-  MCP, plugin, and portable-delivery builds.
-- Laniakea commit `3877815` compiles its real Flow connectors through the fixed
-  profile while retaining its own node placement, interaction, renderer, and
-  crossing bridges.
-- Deterministic Dependency Engine commit `ea546b8` consumes only the 0.3 semantic
-  subpath. Sphere remains its private 3D renderer and does not bundle the 2D
-  compiler or Dagre into the browser surface.
+- Calligram commits `ef42b00` and `e52439f` compile its real document graph
+  through the layered profile and pin the final artifact in its self-contained
+  CLI, desktop, Web, MCP, plugin, and portable-delivery builds.
+- Laniakea commits `3877815` and `d6286d2` compile its real Flow connectors
+  through the fixed profile and pin the final artifact while retaining its own
+  node placement, interaction, renderer, and crossing bridges.
+- Deterministic Dependency Engine commits `ea546b8` and `f5bcace` consume and pin
+  only the 0.3 semantic subpath. Sphere remains its private 3D renderer and does
+  not bundle the 2D compiler or Dagre into the browser surface.
 - All three consumers pin the exact 0.3 artifact with SHA-256
-  `344bbd1eebe00b32de9cd70a0cb47de3699830cdc180212ba365c86bbd008c1d`.
+  `5e43158c0ee7d2e093bac16be10c10ee071fbf78f2386e6162962e626a30ccff`.
 - No final public identity, public repository mutation, push, or npm publication
   is approved.
 
