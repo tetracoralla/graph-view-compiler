@@ -1,10 +1,16 @@
 # Graph Projection repository contract
 
-This repository owns a deterministic, renderer-neutral graph projection
-library. It owns a renderer-neutral semantic interchange graph, bounded pure
-graph operations, and reusable geometry for products that already own a typed
-domain graph. It does not infer business relations, call a model, own a document
-format, or replace Deterministic Dependency Engine.
+`Graph Projection` and `@openadam/graph-projection` are working identifiers,
+not an approved public brand. The owner-confirmed north star is a
+renderer-neutral graph view compiler: applications adapt one authoritative
+typed graph into a versioned interchange graph, run explicit deterministic
+passes, and receive inspectable view plans and quality diagnostics without
+adopting a shared renderer. The current 0.2 implementation is only the first
+semantic and 2D-projection slice of that target. Do not describe the target as
+implemented or publish the working identifiers as the final product name.
+
+Read `docs/NORTH_STAR.md` when planning product expansion and
+`docs/PRODUCT_MODEL.md` when stating what the current release actually owns.
 
 ## Product invariants
 
@@ -35,3 +41,20 @@ format, or replace Deterministic Dependency Engine.
 - Do not publish, push, or install globally without explicit owner authority.
 - Development checks, packed-install checks, consumer runtime checks, and owner
   visual acceptance are separate conclusions.
+
+## Product development rule
+
+- Start from recurrent user friction and first principles. Incumbent products,
+  popularity, funding, and category labels are demand and comparison inputs,
+  not authority and not a reason to leave a real pain unresolved.
+- Overlap is acceptable when a current benchmark, dogfood flow, or direct user
+  observation can falsify or support a materially better route. Do not claim
+  superiority from taste, novelty, or an implementation-authored checklist.
+- Do not let the first extracted module become an accidental product ceiling.
+  Also do not drift into a universal graph platform: every expansion must serve
+  the same developer job, remain inside the compile boundary, answer current
+  demand, and preserve the explicit non-goals in `docs/NORTH_STAR.md`.
+- Visual quality is a product requirement, not a shared-renderer mandate. The
+  compiler owns deterministic view plans, membership, change information, and
+  diagnostics. Consumers own typography, color, interaction, camera, and the
+  final human experience.

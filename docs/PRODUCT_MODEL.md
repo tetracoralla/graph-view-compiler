@@ -1,5 +1,9 @@
 # Product model
 
+Status: current implemented 0.2 boundary. The owner-confirmed target is defined
+in the [North star](NORTH_STAR.md); target capabilities are not current-release
+claims.
+
 Graph Projection is a deterministic library boundary between a product's
 authoritative graph and its renderer. It owns a portable semantic interchange
 graph plus renderer-neutral 2D projection; products retain their domain graph

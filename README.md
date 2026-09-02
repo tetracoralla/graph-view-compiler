@@ -27,6 +27,11 @@ See [engine selection](docs/ENGINE_SELECTION.md) for the Dagre/ELK.js/
 Graphviz/libavoid boundary and why this package is not an Agent replacement for
 traditional graph libraries.
 
+The owner-confirmed target is a broader renderer-neutral
+[graph view compiler](docs/NORTH_STAR.md). That document defines future work and
+explicit non-goals; it must not be read as a claim that the current 0.2 package
+already implements the complete compiler contract.
+
 ## Develop
 
 Use Node.js 22.12 or newer.
