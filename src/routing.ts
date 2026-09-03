@@ -34,6 +34,11 @@ export type OrthogonalRouteGeometryOptions = Omit<
   "sourcePort" | "targetPort"
 >;
 
+interface SideRetryPolicy {
+  source: boolean;
+  target: boolean;
+}
+
 function center(node: NodeBox): Point {
   return { x: node.x + node.width / 2, y: node.y + node.height / 2 };
 }
@@ -104,6 +109,13 @@ export function portOnRectangle(
     normalX: normal.x,
     normalY: normal.y,
   };
+}
+
+function oppositeRectanglePort(node: NodeBox, port: RectanglePort): RectanglePort {
+  const offset = port.side === "left" || port.side === "right"
+    ? port.y - (node.y + node.height / 2)
+    : port.x - (node.x + node.width / 2);
+  return portOnRectangle(node, oppositePort(port.side), offset);
 }
 
 export function choosePorts(
@@ -294,6 +306,18 @@ interface ExpandedObstacle {
   top: number;
 }
 
+function expandObstacles(
+  obstacleNodes: readonly NodeBox[],
+  clearance: number,
+): ExpandedObstacle[] {
+  return obstacleNodes.map((node) => ({
+    left: node.x - clearance,
+    right: node.x + node.width + clearance,
+    top: node.y - clearance,
+    bottom: node.y + node.height + clearance,
+  }));
+}
+
 function pointInsideObstacle(point: Point, obstacle: ExpandedObstacle): boolean {
   return point.x > obstacle.left + EPSILON &&
     point.x < obstacle.right - EPSILON &&
@@ -345,12 +369,7 @@ function obstacleAvoidingPoints(
   }
   const sourceStub = pointOutside(source, sourcePort, stub);
   const targetStub = pointOutside(target, targetPort, stub);
-  const obstacles = obstacleNodes.map((node) => ({
-    left: node.x - clearance,
-    right: node.x + node.width + clearance,
-    top: node.y - clearance,
-    bottom: node.y + node.height + clearance,
-  }));
+  const obstacles = expandObstacles(obstacleNodes, clearance);
   if (obstacles.some((obstacle) => pointInsideObstacle(sourceStub, obstacle)) ||
       obstacles.some((obstacle) => pointInsideObstacle(targetStub, obstacle))) {
     return undefined;
@@ -538,6 +557,62 @@ function obstacleAvoidingPoints(
   return compactOrthogonalPoints([source, ...result, target]);
 }
 
+// Distance from an obstacle rectangle to the axis-aligned source/target
+// bounding box. Used to spend the per-edge obstacle budget on the boxes the
+// route can actually meet instead of giving up on whole-graph size.
+function rectangleCorridorDistance(
+  node: NodeBox,
+  left: number,
+  right: number,
+  top: number,
+  bottom: number,
+): number {
+  const dx = Math.max(left - (node.x + node.width), node.x - right, 0);
+  const dy = Math.max(top - (node.y + node.height), node.y - bottom, 0);
+  return Math.hypot(dx, dy);
+}
+
+function selectCorridorObstacles(
+  obstacleNodes: readonly NodeBox[],
+  source: Point,
+  target: Point,
+  budget: number,
+): NodeBox[] {
+  if (budget <= 0) return [];
+  const left = Math.min(source.x, target.x);
+  const right = Math.max(source.x, target.x);
+  const top = Math.min(source.y, target.y);
+  const bottom = Math.max(source.y, target.y);
+  return obstacleNodes
+    .map((node) => ({
+      distance: rectangleCorridorDistance(node, left, right, top, bottom),
+      node,
+    }))
+    .sort((leftEntry, rightEntry) =>
+      leftEntry.distance !== rightEntry.distance
+        ? leftEntry.distance - rightEntry.distance
+        : compareGraphIds(leftEntry.node.id, rightEntry.node.id),
+    )
+    .slice(0, budget)
+    .map((entry) => entry.node);
+}
+
+function simpleRouteIsClear(
+  points: readonly Point[],
+  sourceStub: Point,
+  targetStub: Point,
+  expanded: readonly ExpandedObstacle[],
+): boolean {
+  if (expanded.length === 0) return true;
+  if (expanded.some((obstacle) => pointInsideObstacle(sourceStub, obstacle)) ||
+      expanded.some((obstacle) => pointInsideObstacle(targetStub, obstacle))) {
+    return false;
+  }
+  return points.every((point, index) =>
+    index === 0 || segmentClear(points[index - 1]!, point, expanded),
+  );
+}
+
 export function routeOrthogonal(
   sourceNode: NodeBox,
   targetNode: NodeBox,
@@ -551,9 +626,42 @@ export function routeOrthogonal(
   );
   const source = portOnRectangle(sourceNode, ports.sourcePort);
   const target = portOnRectangle(targetNode, ports.targetPort);
-  return routeOrthogonalBetweenPorts(sourceNode, targetNode, source, target, options);
+  return routeOrthogonalBetweenPortsWithRetries(
+    sourceNode,
+    targetNode,
+    source,
+    target,
+    options,
+    {
+      source: options.sourcePort === undefined,
+      target: options.targetPort === undefined,
+    },
+  );
 }
 
+function sideRetryCandidates(
+  sourceNode: NodeBox,
+  targetNode: NodeBox,
+  source: RectanglePort,
+  target: RectanglePort,
+  policy: SideRetryPolicy,
+): Array<{ source: RectanglePort; target: RectanglePort }> {
+  const oppositeSource = oppositeRectanglePort(sourceNode, source);
+  const oppositeTarget = oppositeRectanglePort(targetNode, target);
+  return [
+    ...(policy.source ? [{ source: oppositeSource, target }] : []),
+    ...(policy.target ? [{ source, target: oppositeTarget }] : []),
+    ...(policy.source && policy.target
+      ? [{ source: oppositeSource, target: oppositeTarget }]
+      : []),
+  ];
+}
+
+// A center-to-center side choice can park a stub inside a neighbouring node's
+// clearance box (wrap edges in dense grids), which no corridor search can
+// recover from. Internal projection calls can escalate through deterministic
+// flips for only the auto-chosen endpoint sides. The public between-ports entry
+// treats both supplied rectangle ports as authoritative.
 export function routeOrthogonalBetweenPorts(
   sourceNode: NodeBox,
   targetNode: NodeBox,
@@ -561,30 +669,78 @@ export function routeOrthogonalBetweenPorts(
   target: RectanglePort,
   options: OrthogonalRouteGeometryOptions = {},
 ): OrthogonalRoute {
+  return attemptOrthogonalRoute(sourceNode, targetNode, source, target, options);
+}
+
+/** Internal projection seam; intentionally not re-exported by the package. */
+export function routeOrthogonalBetweenPortsWithRetries(
+  sourceNode: NodeBox,
+  targetNode: NodeBox,
+  source: RectanglePort,
+  target: RectanglePort,
+  options: OrthogonalRouteGeometryOptions,
+  policy: SideRetryPolicy,
+): OrthogonalRoute {
+  const route = attemptOrthogonalRoute(sourceNode, targetNode, source, target, options);
+  if (route.fallbackReason !== "no-corridor") return route;
+  for (const candidate of sideRetryCandidates(sourceNode, targetNode, source, target, policy)) {
+    const retry = attemptOrthogonalRoute(sourceNode, targetNode, candidate.source, candidate.target, options);
+    if (retry.fallbackReason === undefined) return retry;
+  }
+  return route;
+}
+
+function attemptOrthogonalRoute(
+  sourceNode: NodeBox,
+  targetNode: NodeBox,
+  source: RectanglePort,
+  target: RectanglePort,
+  options: OrthogonalRouteGeometryOptions,
+): OrthogonalRoute {
+  const stub = options.stub ?? 30;
+  const clearance = options.clearance ?? 14;
+  const turnCost = options.turnCost ?? 28;
+  const maximumObstacles = options.maximumObstacles ?? 40;
   const obstacleNodes = (options.obstacles ?? []).filter((node) =>
     node.id !== sourceNode.id && node.id !== targetNode.id,
   );
-  const stub = options.stub ?? 30;
-  const maximumObstacles = options.maximumObstacles ?? 40;
-  const avoiding = obstacleNodes.length === 0 || obstacleNodes.length > maximumObstacles
-    ? undefined
-    : obstacleAvoidingPoints(
+  const truncated = obstacleNodes.length > maximumObstacles;
+  const selected = truncated
+    ? selectCorridorObstacles(obstacleNodes, source, target, maximumObstacles)
+    : obstacleNodes;
+  const expanded = expandObstacles(selected, clearance);
+  const simplePoints = simpleOrthogonalPoints(source, target, source.side, target.side, stub);
+  // An empty selection only means "clear" when there was nothing to avoid;
+  // an exhausted budget is degradation, not clearance.
+  const clear = selected.length === 0
+    ? obstacleNodes.length === 0
+    : simpleRouteIsClear(
+        simplePoints,
+        pointOutside(source, source.side, stub),
+        pointOutside(target, target.side, stub),
+        expanded,
+      );
+  const avoiding = selected.length > 0 && !clear
+    ? obstacleAvoidingPoints(
         source,
         target,
         source.side,
         target.side,
-        obstacleNodes,
+        selected,
         stub,
-        options.clearance ?? 14,
-        options.turnCost ?? 28,
+        clearance,
+        turnCost,
         maximumObstacles,
-      );
-  const points = avoiding ?? simpleOrthogonalPoints(source, target, source.side, target.side, stub);
-  const fallbackReason = obstacleNodes.length > maximumObstacles
-    ? "obstacle-limit"
-    : obstacleNodes.length > 0 && avoiding === undefined
-      ? "no-corridor"
-      : undefined;
+      )
+    : undefined;
+  const points = avoiding ?? simplePoints;
+  const fallbackReason = obstacleNodes.length === 0 || clear
+    ? undefined
+    : avoiding === undefined && selected.length === 0
+      ? "obstacle-limit"
+      : avoiding === undefined
+        ? "no-corridor"
+        : undefined;
   return {
     source,
     target,
@@ -632,6 +788,84 @@ function lineWithJumps(
   return `${path} L ${target.x} ${target.y}`;
 }
 
+interface RoundedCorner {
+  before: Point;
+  after: Point;
+}
+
+const ROUTE_JUMP_RADIUS = 6;
+
+function roundedCorners(
+  points: readonly Point[],
+  radius: number,
+): Array<RoundedCorner | undefined> {
+  const corners: Array<RoundedCorner | undefined> = new Array(points.length);
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = points[index - 1]!;
+    const current = points[index]!;
+    const next = points[index + 1]!;
+    const beforeLength = distance(previous, current);
+    const afterLength = distance(current, next);
+    if (beforeLength < EPSILON || afterLength < EPSILON) continue;
+    const cornerRadius = Math.min(radius, beforeLength / 2, afterLength / 2);
+    corners[index] = {
+      before: offsetToward(current, previous, cornerRadius),
+      after: offsetToward(current, next, cornerRadius),
+    };
+  }
+  return corners;
+}
+
+function pointFitsSegment(
+  point: Point,
+  source: Point,
+  target: Point,
+  margin: number,
+): boolean {
+  if (Math.abs(source.y - target.y) < EPSILON && Math.abs(point.y - source.y) < EPSILON) {
+    return point.x >= Math.min(source.x, target.x) + margin - EPSILON &&
+      point.x <= Math.max(source.x, target.x) - margin + EPSILON;
+  }
+  if (Math.abs(source.x - target.x) < EPSILON && Math.abs(point.x - source.x) < EPSILON) {
+    return point.y >= Math.min(source.y, target.y) + margin - EPSILON &&
+      point.y <= Math.max(source.y, target.y) - margin + EPSILON;
+  }
+  return false;
+}
+
+/** Internal compiler seam; intentionally not re-exported by the package. */
+export function jumpsForRoundedOrthogonalPath(
+  points: readonly Point[],
+  jumps: readonly RouteJump[],
+  radius = 12,
+): RouteJump[] {
+  const compact = compactOrthogonalPoints(points);
+  if (compact.length < 2 || jumps.length === 0) return [];
+  const corners = roundedCorners(compact, radius);
+  const result: RouteJump[] = [];
+  const lastSegment = compact.length - 2;
+  for (let segmentIndex = 0; segmentIndex <= lastSegment; segmentIndex += 1) {
+    const source = segmentIndex === 0
+      ? compact[0]!
+      : corners[segmentIndex]?.after ?? compact[segmentIndex]!;
+    const target = segmentIndex === lastSegment
+      ? compact.at(-1)!
+      : corners[segmentIndex + 1]?.before ?? compact[segmentIndex + 1]!;
+    const ordered = jumps
+      .filter((jump) => jump.segmentIndex === segmentIndex &&
+        pointFitsSegment(jump, source, target, ROUTE_JUMP_RADIUS))
+      .sort((left, right) => distance(source, left) - distance(source, right));
+    let previousDistance = Number.NEGATIVE_INFINITY;
+    for (const jump of ordered) {
+      const currentDistance = distance(source, jump);
+      if (currentDistance - previousDistance < ROUTE_JUMP_RADIUS * 2 - EPSILON) continue;
+      result.push(jump);
+      previousDistance = currentDistance;
+    }
+  }
+  return result;
+}
+
 export function roundedOrthogonalPath(
   points: readonly Point[],
   jumps: readonly RouteJump[] = [],
@@ -641,26 +875,24 @@ export function roundedOrthogonalPath(
   const first = compact[0];
   if (!first) return "";
   if (compact.length === 1) return `M ${first.x} ${first.y}`;
+  const safeJumps = jumpsForRoundedOrthogonalPath(compact, jumps, radius);
+  const corners = roundedCorners(compact, radius);
   let path = `M ${first.x} ${first.y}`;
+  let segmentSource = first;
   for (let index = 1; index < compact.length - 1; index += 1) {
-    const previous = compact[index - 1]!;
     const current = compact[index]!;
-    const next = compact[index + 1]!;
-    const beforeLength = distance(previous, current);
-    const afterLength = distance(current, next);
-    if (beforeLength < EPSILON || afterLength < EPSILON) continue;
-    const cornerRadius = Math.min(radius, beforeLength / 2, afterLength / 2);
-    const before = offsetToward(current, previous, cornerRadius);
-    const after = offsetToward(current, next, cornerRadius);
-    const segmentJumps = jumps.filter((jump) => jump.segmentIndex === index - 1);
-    path += lineWithJumps(previous, before, segmentJumps);
-    path += ` Q ${current.x} ${current.y} ${after.x} ${after.y}`;
+    const corner = corners[index];
+    if (!corner) continue;
+    const segmentJumps = safeJumps.filter((jump) => jump.segmentIndex === index - 1);
+    path += lineWithJumps(segmentSource, corner.before, segmentJumps);
+    path += ` Q ${current.x} ${current.y} ${corner.after.x} ${corner.after.y}`;
+    segmentSource = corner.after;
   }
   const lastIndex = compact.length - 1;
   path += lineWithJumps(
-    compact[lastIndex - 1]!,
+    segmentSource,
     compact[lastIndex]!,
-    jumps.filter((jump) => jump.segmentIndex === lastIndex - 1),
+    safeJumps.filter((jump) => jump.segmentIndex === lastIndex - 1),
   );
   return path;
 }

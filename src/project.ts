@@ -1,9 +1,11 @@
 import { layoutLayeredGraph } from "./layered.js";
 import {
   allocateRectanglePorts,
+  jumpsForRoundedOrthogonalPath,
   pointOnRoute,
   roundedOrthogonalPath,
-  routeOrthogonalBetweenPorts,
+  routeCrossings,
+  routeOrthogonalBetweenPortsWithRetries,
 } from "./routing.js";
 import {
   GraphProjectionError,
@@ -18,7 +20,10 @@ import type {
   Point,
   ProjectionGraphV1,
   ProjectionIssue,
+  RouteJump,
+  RoutedEdge,
 } from "./types.js";
+import { MAX_GRAPH_VIEW_ROUTE_CROSSINGS_WORK } from "./types.js";
 import type { OrthogonalRouteGeometryOptions } from "./routing.js";
 
 export interface ProjectedEdge {
@@ -75,6 +80,30 @@ function extent(values: readonly number[]): number {
   return maximum - minimum;
 }
 
+// Bridge arcs require comparing segment pairs. This cheap conservative upper
+// bound includes pairs later skipped for shared endpoints, so the whole view
+// declines jumps before it can pay unbounded quadratic work.
+function boundedRouteCrossingJumps(
+  routed: readonly ProjectedEdge[],
+): Readonly<Record<string, readonly RouteJump[]>> | undefined {
+  let segmentsTotal = 0;
+  let segmentsSquared = 0;
+  for (const edge of routed) {
+    const segments = Math.max(0, edge.route.points.length - 1);
+    segmentsTotal += segments;
+    segmentsSquared += segments * segments;
+  }
+  const pairChecks = (segmentsTotal * segmentsTotal - segmentsSquared) / 2;
+  if (pairChecks > MAX_GRAPH_VIEW_ROUTE_CROSSINGS_WORK) return undefined;
+  const routedEdges: RoutedEdge[] = routed.map((edge) => ({
+    id: edge.id,
+    sourceId: edge.source,
+    targetId: edge.target,
+    route: edge.route,
+  }));
+  return routeCrossings(routedEdges);
+}
+
 function projectPositionedGraph(
   graph: ProjectionGraphV1,
   nodes: readonly NodeBox[],
@@ -84,16 +113,23 @@ function projectPositionedGraph(
   const safeRouting = sanitizedRouting(routing);
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const ports = allocateRectanglePorts(nodes, graph.edges);
-  const edges = graph.edges.flatMap((edge) => {
+  const routed = graph.edges.flatMap((edge) => {
     const sourceNode = byId.get(edge.source);
     const targetNode = byId.get(edge.target);
     const source = ports.get(`${edge.id}:source`);
     const target = ports.get(`${edge.id}:target`);
     if (!sourceNode || !targetNode || !source || !target) return [];
-    const route = routeOrthogonalBetweenPorts(sourceNode, targetNode, source, target, {
-      obstacles: nodes,
-      ...safeRouting,
-    });
+    const route = routeOrthogonalBetweenPortsWithRetries(
+      sourceNode,
+      targetNode,
+      source,
+      target,
+      { obstacles: nodes, ...safeRouting },
+      {
+        source: edge.sourcePort === undefined,
+        target: edge.targetPort === undefined,
+      },
+    );
     const midpoint = routeMidpoint(route);
     const labelWidth = edge.labelWidth ??
       (edge.label ? Math.min(160, Math.max(24, edge.label.length * 12)) : 0);
@@ -105,7 +141,7 @@ function projectPositionedGraph(
       direction: edge.direction,
       endpoints: endpointStylesForDirection(edge.direction),
       route,
-      path: roundedOrthogonalPath(route.points),
+      path: "",
       ...(edge.label === undefined
         ? {}
         : {
@@ -118,6 +154,17 @@ function projectPositionedGraph(
             },
           }),
     }];
+  });
+  const jumpsById = boundedRouteCrossingJumps(routed);
+  const edges = routed.map((edge) => {
+    const jumps = jumpsById === undefined
+      ? undefined
+      : jumpsForRoundedOrthogonalPath(edge.route.points, jumpsById[edge.id] ?? []);
+    return {
+      ...edge,
+      route: jumps === undefined ? edge.route : { ...edge.route, jumps },
+      path: roundedOrthogonalPath(edge.route.points, jumps ?? []),
+    };
   });
   const xs = [
     ...nodes.flatMap((node) => [node.x, node.x + node.width]),

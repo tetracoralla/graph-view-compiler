@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as rootApi from "../src/index.js";
 import {
   GRAPH_PROJECTION_VERSION,
   MAX_PROJECTION_EDGES,
@@ -50,6 +51,12 @@ const semanticGraph = {
 };
 
 describe("versioned semantic graph", () => {
+  it("keeps normalized-input fast paths out of the public package API", () => {
+    expect(Object.keys(rootApi).filter((key) => key.includes("NormalizedSemantic"))).toEqual([]);
+    expect("routeOrthogonalBetweenPortsWithRetries" in rootApi).toBe(false);
+    expect("jumpsForRoundedOrthogonalPath" in rootApi).toBe(false);
+  });
+
   it("orders full Unicode code points and strips undeclared product state", () => {
     expect(compareGraphIds("\uE000", "😀")).toBeLessThan(0);
     const normalized = normalizeSemanticGraph({
@@ -407,6 +414,25 @@ describe("ports and routing", () => {
     const crossings = routeCrossings(routed);
     expect(crossings.horizontal).toHaveLength(1);
     expect(crossings.vertical).toHaveLength(0);
+  });
+
+  it("never emits a backward path for jumps near corners or one another", () => {
+    const nearCorner = roundedOrthogonalPath(
+      [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }],
+      [{ x: 91, y: 0, segmentIndex: 0 }],
+    );
+    expect(nearCorner).not.toContain("Q 91 -6");
+    expect(nearCorner).toBe("M 0 0 L 88 0 Q 100 0 100 12 L 100 100");
+
+    const crowded = roundedOrthogonalPath(
+      [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+      [
+        { x: 40, y: 0, segmentIndex: 0 },
+        { x: 45, y: 0, segmentIndex: 0 },
+      ],
+    );
+    expect(crowded.match(/ Q /gu)).toHaveLength(1);
+    expect(crowded).toBe("M 0 0 L 34 0 Q 40 -6 46 0 L 100 0");
   });
 });
 

@@ -64,13 +64,34 @@ influence layered placement only; they do not change relation meaning and are
 never added to the semantic graph.
 
 Routing accepts only `stub`, `clearance`, `turnCost`, and
-`maximumObstacles`. Obstacle-aware routing is capped at 96 unrelated nodes per
-edge. When the selected lower budget is exceeded, the compiler uses its
-deterministic simple orthogonal fallback and returns a
-`routing_obstacle_limit` diagnostic instead of silently implying full obstacle
-inspection. A simple route used because an edge has no unrelated obstacles is
-normal and produces no fallback warning; `routing_fallback` is reserved for an
-edge that had obstacles but no obstacle-avoiding corridor.
+`maximumObstacles`. Each edge may avoid at most 96 unrelated obstacles
+(40 by default). When a view has more unrelated obstacles than the budget, the
+router spends it on the obstacles nearest the edge corridor and still attempts
+obstacle-aware routing; a simple orthogonal route is used only when the route
+already clears every in-budget obstacle, when the budget is zero, or when no
+corridor exists. When an auto-chosen port side leaves no corridor (for
+example, a wrap edge whose approach stub lands in a neighbour's clearance
+box), the router escalates through deterministic side flips for each
+auto-chosen endpoint independently while retaining its allocated side offset;
+declared sides are never overridden. A `routing_fallback` diagnostic is
+reserved for an edge that had in-budget obstacles but no obstacle-avoiding
+corridor from any eligible side; a zero budget is reported as
+`routing_obstacle_limit`. Any geometric
+intersection that remains is reported by the quality metrics and
+`edge_node_intersection` diagnostics when detailed inspection fits its own
+declared work budget.
+
+Eligible unrelated route crossings are bridged with non-overlapping jump arcs
+in the generated path and exposed as `route.jumps` when the conservative
+segment-pair work estimate fits the declared route-crossing budget. An empty
+array means the pass completed without an eligible bridge; an absent field
+means the view exceeded the budget and declined jump computation entirely.
+
+Layered placement is additionally bounded by layout depth: the weighted
+longest rank path (or the node count for cyclic graphs, an upper bound on
+Dagre's recursion depth) may not exceed 1,000. Deeper graphs are rejected with
+a typed `layout_depth_exceeded` issue instead of overflowing the call stack
+inside the layout backend.
 
 ## View plan
 
@@ -97,9 +118,10 @@ source of truth.
 Detailed geometric inspection is quadratic in the worst case. The compiler
 performs it only when the declared node-edge and edge-pair work estimate is at
 most 100,000 checks. Larger views receive `complete: false`, null aggregate
-metrics, and an `inspection_limit` diagnostic. At most 256 distinct geometric
-diagnostics are returned, followed by an explicit `diagnostic_limit` notice if
-more were found.
+metrics, and an `inspection_limit` diagnostic. At most 256 diagnostics are
+returned in total. When truncation is necessary, the final slot is an explicit
+`diagnostic_limit` notice and the first 255 deterministically ordered geometric
+and routing diagnostics precede it.
 
 These limits prevent a useful projection from being discarded only because a
 quadratic quality audit is too expensive. A partial inspection is never
@@ -107,13 +129,18 @@ reported as complete.
 
 ## Failure model
 
-Malformed passes, profiles, routing options, prior plans, and stability requests
-throw `GraphViewCompileError` with stable issue codes. Semantic graph failures
-remain `SemanticGraphError`; projection dimensions, endpoints, and fixed
-positions remain `GraphProjectionError`. The compiler rejects unknown routing,
-layout, and pass fields instead of letting product metadata override internal
-geometry inputs.
+All failures from `compileGraphView` throw `GraphViewCompileError` with stable
+issue codes. Invalid semantic graphs and rejected projections are retyped as
+`invalid_semantic_graph` and `invalid_projection`; each issue keeps the
+original identifier, exposes the original machine-readable `causeCode`, and
+prefixes the message with that cause code.
+Low-level entry points (`semanticGraphToProjectionGraph`, `projectLayeredGraph`,
+`projectFixedGraph`, and the semantic operations) keep throwing
+`SemanticGraphError` and `GraphProjectionError` for their own callers. The
+compiler rejects unknown routing, layout, and pass fields instead of letting
+product metadata override internal geometry inputs.
 
 The semantic graph limits remain 5,000 nodes, 20,000 relations, and 2,000
 groups. A 2D plan remains limited to 2,000 visible nodes and 8,000 visible
-relations after the ordered passes.
+relations after the ordered passes, and layered placement to the declared
+layout depth.

@@ -1,11 +1,12 @@
 import {
-  collapseSemanticGroups,
+  collapseNormalizedSemanticGraph,
   compareGraphIds,
-  filterSemanticGraph,
-  groupSemanticNodes,
+  filterNormalizedSemanticGraph,
+  groupNormalizedSemanticGraph,
   normalizeSemanticGraph,
-  semanticGraphToProjectionGraph,
-  sliceSemanticGraph,
+  projectNormalizedSemanticGraph,
+  sliceNormalizedSemanticGraph,
+  SemanticGraphError,
 } from "./semantic-graph.js";
 import {
   projectFixedGraph,
@@ -14,6 +15,7 @@ import {
   type ProjectedGraph,
   type ProjectionRoutingOptions,
 } from "./project.js";
+import { GraphProjectionError } from "./semantics.js";
 import { inspectCompiledView } from "./view-inspection.js";
 import { roundedOrthogonalPath } from "./routing.js";
 import {
@@ -23,6 +25,7 @@ import {
   MAX_PROJECTION_EDGES,
   MAX_PROJECTION_NODES,
   MAX_SEMANTIC_NODES,
+  type CollapsedSemanticGraph,
   type LayeredLayoutOptions,
   type NodeBox,
   type Point,
@@ -348,7 +351,7 @@ function retainMembership(
 
 function composeCollapsedMembership(
   current: GraphViewMembership,
-  collapsed: ReturnType<typeof collapseSemanticGroups>,
+  collapsed: CollapsedSemanticGraph,
 ): GraphViewMembership {
   return {
     nodes: Object.fromEntries(collapsed.graph.nodes.map((node) => [
@@ -374,6 +377,7 @@ function runPasses(
   membership: GraphViewMembership;
   trace: readonly GraphViewPassTrace[];
 } {
+  // One normalization up front; pass variants trust and preserve it.
   let graph = normalizeSemanticGraph(source);
   let membership = initialMembership(graph);
   const trace: GraphViewPassTrace[] = [];
@@ -381,15 +385,15 @@ function runPasses(
     const inputNodes = graph.nodes.length;
     const inputRelations = graph.relations.length;
     if (pass.type === "filter") {
-      graph = filterSemanticGraph(graph, pass.filter);
+      graph = filterNormalizedSemanticGraph(graph, pass.filter);
       membership = retainMembership(membership, graph);
     } else if (pass.type === "slice") {
-      graph = sliceSemanticGraph(graph, pass.slice);
+      graph = sliceNormalizedSemanticGraph(graph, pass.slice);
       membership = retainMembership(membership, graph);
     } else if (pass.type === "group") {
-      graph = groupSemanticNodes(graph, pass.assignment);
+      graph = groupNormalizedSemanticGraph(graph, pass.assignment);
     } else {
-      const collapsed = collapseSemanticGroups(graph, pass.groupIds);
+      const collapsed = collapseNormalizedSemanticGraph(graph, pass.groupIds);
       membership = composeCollapsedMembership(membership, collapsed);
       graph = collapsed.graph;
     }
@@ -403,6 +407,16 @@ function runPasses(
     });
   }
   return { graph, membership, trace };
+}
+
+function retypedCompileFailure(
+  code: "invalid_semantic_graph" | "invalid_projection",
+  error: SemanticGraphError | GraphProjectionError,
+): GraphViewCompileError {
+  return new GraphViewCompileError(error.issues.map((entry) => ({
+    ...issue(code, entry.id, `${entry.code}: ${entry.message}`),
+    causeCode: entry.code,
+  })));
 }
 
 function translateProjectedGraph(
@@ -421,6 +435,7 @@ function translateProjectedGraph(
     nodes: graph.nodes.map((node) => translatePoint(node)),
     edges: graph.edges.map((edge) => {
       const points = edge.route.points.map(translatePoint);
+      const jumps = edge.route.jumps?.map(translatePoint);
       return {
         ...edge,
         route: {
@@ -428,8 +443,9 @@ function translateProjectedGraph(
           source: translatePoint(edge.route.source),
           target: translatePoint(edge.route.target),
           points,
+          ...(jumps === undefined ? {} : { jumps }),
         },
-        path: roundedOrthogonalPath(points),
+        path: roundedOrthogonalPath(points, jumps ?? []),
         ...(edge.label === undefined
           ? {}
           : { label: { ...edge.label, x: edge.label.x + deltaX, y: edge.label.y + deltaY } }),
@@ -600,7 +616,13 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
   if (problems.length > 0) throw new GraphViewCompileError(problems);
 
   const passes = (input.passes ?? []) as readonly GraphViewPass[];
-  const compiled = runPasses(input.graph, passes);
+  let compiled: ReturnType<typeof runPasses>;
+  try {
+    compiled = runPasses(input.graph, passes);
+  } catch (error) {
+    if (error instanceof SemanticGraphError) throw retypedCompileFailure("invalid_semantic_graph", error);
+    throw error;
+  }
   const missingLabelSizes = compiled.graph.relations
     .filter((relation) => relation.label !== undefined && input.labelSizes?.[relation.id] === undefined)
     .map((relation) => issue(
@@ -617,7 +639,7 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
       `Missing projection size for node ${node.id}`,
     ));
   if (missingNodeSizes.length > 0) throw new GraphViewCompileError(missingNodeSizes);
-  const projectionBase = semanticGraphToProjectionGraph(compiled.graph, {
+  const projectionBase = projectNormalizedSemanticGraph(compiled.graph, {
     nodeSizes: input.nodeSizes,
     ...(input.labelSizes === undefined ? {} : { labelSizes: input.labelSizes }),
   });
@@ -634,9 +656,15 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
   const layout = input.profile.type === "layered"
     ? sanitizedLayout(input.profile.layout)
     : undefined;
-  const projected = input.profile.type === "layered"
-    ? projectLayeredGraph(projection, layout!, routing)
-    : projectFixedGraph(projection, { positions: input.profile.positions, routing });
+  let projected: ProjectedGraph;
+  try {
+    projected = input.profile.type === "layered"
+      ? projectLayeredGraph(projection, layout!, routing)
+      : projectFixedGraph(projection, { positions: input.profile.positions, routing });
+  } catch (error) {
+    if (error instanceof GraphProjectionError) throw retypedCompileFailure("invalid_projection", error);
+    throw error;
+  }
   const aligned = alignProjectedGraph(
     projected,
     input.previousPlan,
@@ -660,44 +688,52 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
     };
   });
   const inspection = inspectCompiledView(nodes, edges);
-  const diagnostics: GraphViewDiagnostic[] = inspection.diagnostics
-    .slice(0, MAX_GRAPH_VIEW_DIAGNOSTICS)
-    .map((diagnostic) => ({
-      ...diagnostic,
-      severity: "warning",
-      sourceIds: diagnosticSourceIds(compiled.membership, diagnostic.viewIds),
-    }));
-  if (inspection.diagnostics.length > MAX_GRAPH_VIEW_DIAGNOSTICS) {
-    diagnostics.push({
-      code: "diagnostic_limit",
-      severity: "warning",
-      message: `The view produced ${inspection.diagnostics.length} distinct geometric diagnostics; only the first ${MAX_GRAPH_VIEW_DIAGNOSTICS} are returned`,
-      viewIds: [],
-      sourceIds: [],
-    });
-  }
+  // Inspection and routing diagnostics share one deterministic order and one
+  // cap, so degradation reasons can never crowd the limit notice out of the
+  // plan or bypass the declared returned-diagnostics bound.
+  const candidates: Array<Pick<GraphViewDiagnostic, "code" | "message" | "viewIds">> = [
+    ...inspection.diagnostics,
+  ];
   if (edges.some((edge) => edge.route.fallbackReason === "obstacle-limit")) {
-    diagnostics.push({
+    candidates.push({
       code: "routing_obstacle_limit",
-      severity: "warning",
-      message: `Obstacle-aware routing is bounded to ${routing.maximumObstacles ?? 40} unrelated nodes per edge; simple orthogonal fallback was used`,
+      message: `Obstacle-aware routing is bounded to ${routing.maximumObstacles ?? 40} of the nearest unrelated nodes per edge; simple orthogonal fallback was used`,
       viewIds: [],
-      sourceIds: [],
     });
   }
   for (const edge of edges) {
     if (edge.route.fallbackReason !== "no-corridor") continue;
-    diagnostics.push({
+    candidates.push({
       code: "routing_fallback",
-      severity: "warning",
       message: `Edge ${edge.id} fell back to simple orthogonal routing because no obstacle-avoiding corridor was found`,
       viewIds: [edge.id],
-      sourceIds: diagnosticSourceIds(compiled.membership, [edge.id]),
     });
   }
-  diagnostics.sort((left, right) =>
-    compareGraphIds(`${left.code}\0${left.viewIds.join("\0")}`, `${right.code}\0${right.viewIds.join("\0")}`),
-  );
+  const keyedCandidates = candidates.map((candidate) => ({
+    key: `${candidate.code}\0${candidate.viewIds.join("\0")}`,
+    candidate,
+  }));
+  keyedCandidates.sort((left, right) => compareGraphIds(left.key, right.key));
+  const truncated = keyedCandidates.length > MAX_GRAPH_VIEW_DIAGNOSTICS;
+  const returnedCandidateLimit = truncated
+    ? MAX_GRAPH_VIEW_DIAGNOSTICS - 1
+    : MAX_GRAPH_VIEW_DIAGNOSTICS;
+  const diagnostics: GraphViewDiagnostic[] = keyedCandidates
+    .slice(0, returnedCandidateLimit)
+    .map((entry) => ({
+      ...entry.candidate,
+      severity: "warning",
+      sourceIds: diagnosticSourceIds(compiled.membership, entry.candidate.viewIds),
+    }));
+  if (truncated) {
+    diagnostics.push({
+      code: "diagnostic_limit",
+      severity: "warning",
+      message: `The view produced ${keyedCandidates.length} distinct geometric and routing diagnostics; only the first ${returnedCandidateLimit} are returned within the ${MAX_GRAPH_VIEW_DIAGNOSTICS}-diagnostic response limit`,
+      viewIds: [],
+      sourceIds: [],
+    });
+  }
   const profile: GraphViewProfileSummary = input.profile.type === "layered"
     ? { type: "layered", backend: "dagre-layered-v1", layout: layout! }
     : { type: "fixed", backend: "fixed-position-v1" };

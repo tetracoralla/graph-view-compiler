@@ -10,7 +10,9 @@ export const MAX_SEMANTIC_PATH_STATES = 10_000 as const;
 export const MAX_GRAPH_VIEW_PASSES = 64 as const;
 export const MAX_GRAPH_VIEW_ROUTING_OBSTACLES = 96 as const;
 export const MAX_GRAPH_VIEW_INSPECTION_WORK = 100_000 as const;
+export const MAX_GRAPH_VIEW_ROUTE_CROSSINGS_WORK = 250_000 as const;
 export const MAX_GRAPH_VIEW_DIAGNOSTICS = 256 as const;
+export const MAX_LAYERED_LAYOUT_DEPTH = 1_000 as const;
 
 export type RelationDirection = "directed" | "undirected" | "bidirectional";
 export type EndpointStyle = "none" | "arrow" | "dot" | "ring";
@@ -190,8 +192,18 @@ export interface OrthogonalRoute {
   points: Point[];
   /** Set by this library: whether obstacle-aware routing produced the geometry. */
   strategy?: "obstacle-avoiding" | "simple";
-  /** Present only when a simple route was used as a bounded fallback. */
+  /**
+   * Present only when a simple route was used as a bounded fallback. A simple
+   * route without this field either had no obstacles in budget or already
+   * clears every in-budget obstacle.
+   */
   fallbackReason?: "obstacle-limit" | "no-corridor";
+  /**
+   * Renderable crossing bridge arcs for this route. An empty array means the
+   * bounded crossing pass completed and found no eligible bridge. The field is
+   * absent when the view-level route-crossing work budget is declined.
+   */
+  jumps?: readonly RouteJump[];
 }
 
 export interface RouteJump extends Point {
@@ -267,7 +279,9 @@ export interface ProjectionIssue {
     | "invalid_position"
     | "invalid_dimension"
     | "too_many_nodes"
-    | "too_many_edges";
+    | "too_many_edges"
+    | "layout_depth_exceeded"
+    | "layout_failed";
   message: string;
   id: string;
 }

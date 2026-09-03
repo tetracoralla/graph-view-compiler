@@ -30,6 +30,25 @@ function fanGraph(count) {
   };
 }
 
+// A caller-positioned row whose skip edges cross intermediate nodes. The row
+// has more unrelated obstacles than the default budget, so this fixture
+// exercises nearest-corridor obstacle selection and the route search.
+function rowJumpGraph(count, jumpLength) {
+  return {
+    version: 1,
+    nodes: Array.from({ length: count }, (_, index) => ({ id: `node-${String(index).padStart(4, "0")}` })),
+    relations: Array.from(
+      { length: Math.max(1, Math.floor((count - 1) / jumpLength)) },
+      (_, index) => ({
+        id: `jump-${String(index).padStart(4, "0")}`,
+        source: `node-${String(index * jumpLength).padStart(4, "0")}`,
+        target: `node-${String(Math.min(count - 1, (index + 1) * jumpLength)).padStart(4, "0")}`,
+        direction: "directed",
+      }),
+    ),
+  };
+}
+
 function nodeSizes(graph) {
   return Object.fromEntries(graph.nodes.map((node) => [node.id, { width: 120, height: 52 }]));
 }
@@ -46,19 +65,22 @@ function percentile(values, ratio) {
   return ordered[Math.min(ordered.length - 1, Math.floor(ordered.length * ratio))] ?? 0;
 }
 
-function measureCase(name, input, runs = 5) {
+function measureCase(name, input, runs = 5, verify) {
   const durations = [];
   const hashes = [];
   let bytes = 0;
+  let lastPlan;
   for (let run = 0; run < runs; run += 1) {
     const started = performance.now();
     const plan = compileGraphView(input);
     durations.push(performance.now() - started);
+    lastPlan = plan;
     const serialized = JSON.stringify(plan);
     bytes = Buffer.byteLength(serialized);
     hashes.push(createHash("sha256").update(serialized).digest("hex"));
   }
   assert.equal(new Set(hashes).size, 1, `${name} produced non-deterministic output`);
+  if (verify !== undefined) verify(lastPlan);
   return {
     name,
     runs,
@@ -92,6 +114,8 @@ function coldImport(subpath, runs = 5) {
 const chain100 = chainGraph(100);
 const fan250 = fanGraph(250);
 const chain500 = chainGraph(500);
+const chain1000 = chainGraph(1000);
+const rowJump45 = rowJumpGraph(45, 6);
 const cases = [
   measureCase("layered-chain-100", {
     graph: chain100,
@@ -112,6 +136,28 @@ const cases = [
     graph: chain500,
     nodeSizes: nodeSizes(chain500),
     profile: { type: "fixed", positions: fixedPositions(chain500) },
+  }),
+  measureCase("caller-positioned-row-jump-45", {
+    graph: rowJump45,
+    nodeSizes: nodeSizes(rowJump45),
+    profile: {
+      type: "fixed",
+      positions: Object.fromEntries(rowJump45.nodes.map((node, index) => [
+        node.id,
+        { x: index * 180, y: 0 },
+      ])),
+    },
+  }, 5, (plan) => {
+    const strategies = new Set(plan.edges.map((edge) => edge.route.strategy));
+    assert.ok(
+      strategies.has("obstacle-avoiding"),
+      `expected obstacle-aware routing to run; strategies were ${[...strategies].join(", ")}`,
+    );
+  }),
+  measureCase("layered-chain-1000", {
+    graph: chain1000,
+    nodeSizes: nodeSizes(chain1000),
+    profile: { type: "layered", layout: { direction: "left-to-right" } },
   }),
 ];
 

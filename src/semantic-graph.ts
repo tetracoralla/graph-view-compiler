@@ -36,19 +36,18 @@ export class SemanticGraphError extends Error {
 }
 
 export function compareGraphIds(left: string, right: string): number {
-  const leftPoints = [...left];
-  const rightPoints = [...right];
-  const length = Math.min(leftPoints.length, rightPoints.length);
-  for (let index = 0; index < length; index += 1) {
-    const leftPoint = leftPoints[index]?.codePointAt(0) ?? 0;
-    const rightPoint = rightPoints[index]?.codePointAt(0) ?? 0;
+  let index = 0;
+  while (index < left.length && index < right.length) {
+    const leftPoint = left.codePointAt(index)!;
+    const rightPoint = right.codePointAt(index)!;
     if (leftPoint !== rightPoint) return leftPoint < rightPoint ? -1 : 1;
+    index += leftPoint > 0xffff ? 2 : 1;
   }
-  return leftPoints.length < rightPoints.length
-    ? -1
-    : leftPoints.length > rightPoints.length
-      ? 1
-      : 0;
+  return left.length === right.length
+    ? 0
+    : left.length < right.length
+      ? -1
+      : 1;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -291,6 +290,12 @@ export function normalizeSemanticGraph(graph: SemanticGraphV1): SemanticGraphV1 
   };
 }
 
+// Variants below operate on an already-normalized graph: validated, cloned,
+// and sorted by identifier. Public operations normalize once and delegate;
+// ordered pipelines call the variants directly to avoid re-validating the
+// whole graph after every pass. Each variant returns a normalized-shaped
+// graph without mutating its input.
+
 function groupDescendants(groups: readonly SemanticGroup[]): ReadonlyMap<string, ReadonlySet<string>> {
   const children = new Map<string, string[]>();
   for (const group of groups) {
@@ -323,11 +328,10 @@ function selectionIssues(known: ReadonlySet<string>, selected: readonly string[]
   );
 }
 
-export function filterSemanticGraph(
-  graph: SemanticGraphV1,
+export function filterNormalizedSemanticGraph(
+  normalized: SemanticGraphV1,
   filter: SemanticGraphFilter,
 ): SemanticGraphV1 {
-  const normalized = normalizeSemanticGraph(graph);
   const groups = normalized.groups ?? [];
   const nodeIds = new Set(normalized.nodes.map((node) => node.id));
   const groupIds = new Set(groups.map((group) => group.id));
@@ -369,6 +373,13 @@ export function filterSemanticGraph(
     relations,
     ...(keptGroups.length === 0 ? {} : { groups: keptGroups }),
   };
+}
+
+export function filterSemanticGraph(
+  graph: SemanticGraphV1,
+  filter: SemanticGraphFilter,
+): SemanticGraphV1 {
+  return filterNormalizedSemanticGraph(normalizeSemanticGraph(graph), filter);
 }
 
 interface AdjacencyStep {
@@ -419,11 +430,10 @@ function checkedDirection(
   return direction;
 }
 
-export function sliceSemanticGraph(
-  graph: SemanticGraphV1,
+export function sliceNormalizedSemanticGraph(
+  normalized: SemanticGraphV1,
   options: SemanticGraphSlice,
 ): SemanticGraphV1 {
-  const normalized = normalizeSemanticGraph(graph);
   const known = new Set(normalized.nodes.map((node) => node.id));
   const problems = selectionIssues(known, options.focus, "focus node");
   if (options.focus.length === 0) {
@@ -444,7 +454,14 @@ export function sliceSemanticGraph(
       pending.push({ id: step.nodeId, depth: current.depth + 1 });
     }
   }
-  return filterSemanticGraph(normalized, { nodeIds: [...selected] });
+  return filterNormalizedSemanticGraph(normalized, { nodeIds: [...selected] });
+}
+
+export function sliceSemanticGraph(
+  graph: SemanticGraphV1,
+  options: SemanticGraphSlice,
+): SemanticGraphV1 {
+  return sliceNormalizedSemanticGraph(normalizeSemanticGraph(graph), options);
 }
 
 export function findSemanticPaths(
@@ -508,11 +525,10 @@ export function findSemanticPaths(
   return found;
 }
 
-export function groupSemanticNodes(
-  graph: SemanticGraphV1,
+export function groupNormalizedSemanticGraph(
+  normalized: SemanticGraphV1,
   assignment: SemanticGroupAssignment,
 ): SemanticGraphV1 {
-  const normalized = normalizeSemanticGraph(graph);
   const knownNodes = new Set(normalized.nodes.map((node) => node.id));
   const groups = normalized.groups ?? [];
   const knownGroups = new Set(groups.map((group) => group.id));
@@ -527,12 +543,22 @@ export function groupSemanticNodes(
   }
   if (problems.length > 0) throw new SemanticGraphError(problems);
   const selected = new Set(assignment.nodeIds);
-  return normalizeSemanticGraph({
+  const mergedGroups = [...groups, cloneGroup(assignment.group)]
+    .sort((left, right) => compareGraphIds(left.id, right.id));
+  return {
     version: SEMANTIC_GRAPH_VERSION,
-    nodes: normalized.nodes.map((node) => selected.has(node.id) ? { ...node, groupId: assignment.group.id } : node),
+    nodes: normalized.nodes.map((node) =>
+      selected.has(node.id) ? { ...node, groupId: assignment.group.id } : node),
     relations: normalized.relations,
-    groups: [...groups, cloneGroup(assignment.group)],
-  });
+    groups: mergedGroups,
+  };
+}
+
+export function groupSemanticNodes(
+  graph: SemanticGraphV1,
+  assignment: SemanticGroupAssignment,
+): SemanticGraphV1 {
+  return groupNormalizedSemanticGraph(normalizeSemanticGraph(graph), assignment);
 }
 
 function selectedCollapseGroup(
@@ -549,11 +575,10 @@ function selectedCollapseGroup(
   return selectedAncestor;
 }
 
-export function collapseSemanticGroups(
-  graph: SemanticGraphV1,
+export function collapseNormalizedSemanticGraph(
+  normalized: SemanticGraphV1,
   groupIds: readonly string[],
 ): CollapsedSemanticGraph {
-  const normalized = normalizeSemanticGraph(graph);
   const groups = normalized.groups ?? [];
   const knownGroups = new Set(groups.map((group) => group.id));
   const problems = selectionIssues(knownGroups, groupIds, "group");
@@ -628,12 +653,15 @@ export function collapseSemanticGroups(
     for (const descendant of descendants.get(groupId) ?? [groupId]) removedGroups.add(descendant);
   }
   const remainingGroups = groups.filter((group) => !removedGroups.has(group.id));
-  const collapsed = normalizeSemanticGraph({
+  // Nodes are built in traversal order, so sort only the fresh node array;
+  // relations and remaining groups inherit the normalized input order.
+  nodes.sort((left, right) => compareGraphIds(left.id, right.id));
+  const collapsed: SemanticGraphV1 = {
     version: SEMANTIC_GRAPH_VERSION,
     nodes,
     relations,
     ...(remainingGroups.length === 0 ? {} : { groups: remainingGroups }),
-  });
+  };
   for (const members of nodeMembersById.values()) members.sort(compareGraphIds);
   const nodeMembers = Object.fromEntries(nodeMembersById);
   const relationMembers = Object.fromEntries(relationMembersById);
@@ -641,11 +669,17 @@ export function collapseSemanticGroups(
   return { graph: collapsed, nodeMembers, relationMembers, absorbedRelationIds };
 }
 
-export function semanticGraphToProjectionGraph(
+export function collapseSemanticGroups(
   graph: SemanticGraphV1,
+  groupIds: readonly string[],
+): CollapsedSemanticGraph {
+  return collapseNormalizedSemanticGraph(normalizeSemanticGraph(graph), groupIds);
+}
+
+export function projectNormalizedSemanticGraph(
+  normalized: SemanticGraphV1,
   options: SemanticProjectionOptions,
 ): import("./types.js").ProjectionGraphV1 {
-  const normalized = normalizeSemanticGraph(graph);
   const problems: SemanticGraphIssue[] = [];
   const nodeById = new Map(normalized.nodes.map((node) => [node.id, node]));
   const nodes = normalized.nodes.flatMap((node) => {
@@ -682,4 +716,11 @@ export function semanticGraphToProjectionGraph(
       };
     }),
   };
+}
+
+export function semanticGraphToProjectionGraph(
+  graph: SemanticGraphV1,
+  options: SemanticProjectionOptions,
+): import("./types.js").ProjectionGraphV1 {
+  return projectNormalizedSemanticGraph(normalizeSemanticGraph(graph), options);
 }

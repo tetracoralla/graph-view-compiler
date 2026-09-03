@@ -6,7 +6,9 @@ import type {
   LayeredLayoutOptions,
   NodeBox,
   Point,
+  ProjectionIssue,
   SemanticGraphFilter,
+  SemanticGraphIssue,
   SemanticGraphSlice,
   SemanticGraphV1,
   SemanticGroupAssignment,
@@ -84,9 +86,13 @@ export interface GraphViewCompileIssue {
     | "invalid_label_size"
     | "invalid_previous_plan"
     | "missing_previous_plan"
-    | "unknown_anchor";
+    | "unknown_anchor"
+    | "invalid_semantic_graph"
+    | "invalid_projection";
   id: string;
   message: string;
+  /** Machine-readable low-level cause when a compiler boundary retypes it. */
+  causeCode?: SemanticGraphIssue["code"] | ProjectionIssue["code"];
 }
 
 export class GraphViewCompileError extends Error {

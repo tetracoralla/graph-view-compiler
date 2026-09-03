@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+- Reject layered graphs deeper than 1,000 ranks with a typed
+  `layout_depth_exceeded` issue before layout instead of overflowing the call
+  stack inside Dagre on deep chains; unexpected layout failures are retyped as
+  `layout_failed`. Cyclic layered graphs keep compiling within the declared
+  conservative node-count bound.
+- Spend the per-edge obstacle budget on the unrelated obstacles nearest the
+  edge corridor instead of giving up when a view exceeds the budget. Edges
+  whose simple route already clears every in-budget obstacle use it directly.
+  When an auto-chosen port side leaves no corridor, the router escalates
+  through deterministic per-endpoint side flips that preserve allocated port
+  offsets; declared semantic port sides are never overridden. Large fixed
+  views gain obstacle-aware geometry that previously degraded to the simple
+  fallback above roughly 40 obstacles per edge.
+- Bridge eligible unrelated route crossings with non-overlapping jump arcs in
+  the generated edge path and expose them as `route.jumps` when the
+  conservative segment-pair estimate fits the new 250,000-check
+  route-crossing work budget. Empty arrays distinguish a completed pass with
+  no eligible bridge from an absent field when the budget is declined.
+- Unify the compile failure surface: `compileGraphView` now always throws
+  `GraphViewCompileError`. Semantic graph failures are retyped as
+  `invalid_semantic_graph` and projection failures (including missing or
+  invalid fixed positions and the layout depth bound) as `invalid_projection`,
+  each keeping the original identifier and exposing the original issue code as
+  machine-readable `causeCode` as well as in the message.
+  Low-level entry points keep their own error types. Consumers that caught
+  `GraphProjectionError` or `SemanticGraphError` from `compileGraphView` must
+  catch `GraphViewCompileError` instead.
+- Cap returned diagnostics at 256 total across geometric and routing entries,
+  including the limit notice, so per-edge fallback reasons can no longer
+  bypass the declared response bound; the notice reports the true total.
+- Stop re-validating, cloning, and re-sorting the whole semantic graph after
+  every ordered pass; passes operate on the normalized graph and preserve it.
+- Rewrite `compareGraphIds` without per-comparison allocations while keeping
+  the exact Unicode code-point order.
+- Measure obstacle-aware routing and a 1,000-node layered chain in
+  `npm run measure:compiler`, failing if no edge reports the
+  `obstacle-avoiding` strategy so the suite cannot skip the routing path.
+
 ## 0.3.0 - 2026-09-02
 
 - Add the versioned renderer-neutral `GraphViewPlanV1` compiler contract and
