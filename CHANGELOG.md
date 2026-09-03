@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2026-09-03
 
 - Reject layered graphs deeper than 1,000 ranks with a typed
   `layout_depth_exceeded` issue before layout instead of overflowing the call

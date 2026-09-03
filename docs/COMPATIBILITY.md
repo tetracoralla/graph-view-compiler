@@ -25,6 +25,13 @@ fixed-position projection, ordered graph passes, versioned view plans, source
 membership, bounded diagnostics, and change reconciliation. Compiler view-plan
 versioning is independent from both npm versioning and `SemanticGraphV1`.
 
+The 0.4 line keeps the graph and view-plan format versions at 1 while hardening
+layout depth, obstacle routing, crossing bridges, diagnostic bounds, and
+ordered-pass performance. `compileGraphView` now consistently throws
+`GraphViewCompileError`; callers that caught `SemanticGraphError` or
+`GraphProjectionError` from that high-level entry must migrate their catch
+logic. Low-level entry points retain their prior error classes.
+
 Every release must pass:
 
 1. library typecheck, unit tests, build, legal and payload inventory;

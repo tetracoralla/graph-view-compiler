@@ -100,7 +100,7 @@ try {
     path.join(consumerDirectory, "node_modules/@openadam/graph-view-compiler/package.json"),
     "utf8",
   ));
-  assert.equal(installedManifest.version, "0.3.0");
+  assert.equal(installedManifest.version, "0.4.0");
   process.stdout.write("Packed install and independent typed consumer checks passed.\n");
 } finally {
   await rm(workspace, { recursive: true, force: true });

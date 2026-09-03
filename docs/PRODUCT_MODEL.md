@@ -1,6 +1,6 @@
 # Product model
 
-Status: current implemented 0.3 boundary. The owner-confirmed target is defined
+Status: current implemented 0.4 boundary. The owner-confirmed target is defined
 in the [North star](NORTH_STAR.md); target capabilities are not current-release
 claims.
 

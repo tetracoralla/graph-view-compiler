@@ -34,7 +34,7 @@ Graphviz/libavoid boundary and why this package is not an Agent replacement for
 traditional graph libraries.
 
 The owner-confirmed product is a renderer-neutral
-[graph view compiler](docs/NORTH_STAR.md). The current 0.3 API implements its
+[graph view compiler](docs/NORTH_STAR.md). The current 0.4 API implements its
 stable narrow waist for layered and caller-positioned 2D views; the document
 also defines explicit non-goals and the conditions for future expansion. The
 public contract is described by the [compiler contract](docs/COMPILER.md).
@@ -46,7 +46,7 @@ rerunnable package, cold-import, determinism, and compile-time measurement.
 ## Install
 
 ```sh
-npm install @openadam/graph-view-compiler@0.3.0
+npm install @openadam/graph-view-compiler@0.4.0
 ```
 
 ## Quick start
@@ -95,7 +95,7 @@ Applications should pin an exact compatible registry version:
 ```json
 {
   "dependencies": {
-      "@openadam/graph-view-compiler": "0.3.0"
+      "@openadam/graph-view-compiler": "0.4.0"
   }
 }
 ```

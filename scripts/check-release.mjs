@@ -8,7 +8,7 @@ const license = await readFile("LICENSE", "utf8");
 const notice = await readFile("NOTICE", "utf8");
 
 assert.equal(manifest.name, "@openadam/graph-view-compiler");
-assert.equal(manifest.version, "0.3.0");
+assert.equal(manifest.version, "0.4.0");
 assert.equal(manifest.private, undefined, "the independently distributable package cannot be private");
 assert.equal(manifest.license, "Apache-2.0");
 assert.equal(manifest.publishConfig?.access, "public");

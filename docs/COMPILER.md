@@ -1,6 +1,8 @@
 # Graph view compiler contract
 
-Version 0.3 adds one high-level `compileGraphView` entry point. It converts a
+Version 0.3 introduced the high-level `compileGraphView` entry point. Version
+0.4 hardens its deterministic routing, bounded diagnostics, and unified error
+surface. It converts a
 versioned semantic graph into a renderer-neutral 2D view plan without taking
 ownership of the product's source graph, renderer, style, camera, interaction,
 or persistence.

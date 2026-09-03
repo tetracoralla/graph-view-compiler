@@ -1,6 +1,6 @@
 {
   "name": "@openadam/graph-view-compiler",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A deterministic renderer-neutral graph view compiler for typed product graphs.",
   "type": "module",
   "license": "Apache-2.0",
