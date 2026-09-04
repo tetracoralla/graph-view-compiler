@@ -112,6 +112,17 @@ state while filtering. Constraints are rejected for layered profiles because
 their absolute coordinate system is compiler-generated rather than
 product-authoritative.
 
+Constrained edges use the allocated port sides directly; they do not run and
+then discard automatic obstacle routing or inherit its side retries. When two
+opposite-facing ports are closer than twice the configured stub, automatic and
+constrained routing shorten both stubs to half of the available boundary gap
+rather than letting either stub enter the other endpoint node. A manual
+corridor can still be moved behind one of its own ports; if the final route
+then re-enters an endpoint node, the normal `edge_node_intersection` diagnostic
+reports it. Opaque relation ids such as `__proto__`, `constructor`, and
+`toString` are treated only as own keys in constraint, weight, measurement,
+and position records.
+
 Eligible unrelated route crossings are bridged with non-overlapping jump arcs
 in the generated path and exposed as `route.jumps` when the conservative
 segment-pair work estimate fits the declared route-crossing budget. An empty

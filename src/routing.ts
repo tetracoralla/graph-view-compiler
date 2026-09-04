@@ -216,6 +216,41 @@ export function compactOrthogonalPoints(points: readonly Point[]): Point[] {
   });
 }
 
+function compactConstrainedPoints(points: readonly Point[]): Point[] {
+  const distinct = points.filter((point, index) =>
+    index === 0 || !samePoint(point, points[index - 1]!),
+  );
+  return distinct.filter((point, index) => {
+    if (index === 0 || index === distinct.length - 1) return true;
+    const previous = distinct[index - 1]!;
+    const next = distinct[index + 1]!;
+    // A collinear turnaround is part of a manual constraint: dropping its
+    // extremum would silently remove the promised outward endpoint stub.
+    const vertical = Math.abs(previous.x - point.x) < EPSILON &&
+      Math.abs(point.x - next.x) < EPSILON &&
+      (point.y - previous.y) * (next.y - point.y) >= 0;
+    const horizontal = Math.abs(previous.y - point.y) < EPSILON &&
+      Math.abs(point.y - next.y) < EPSILON &&
+      (point.x - previous.x) * (next.x - point.x) >= 0;
+    return !vertical && !horizontal;
+  });
+}
+
+function facingStubDistance(
+  source: Point,
+  target: Point,
+  sourcePort: PortSide,
+  targetPort: PortSide,
+  requested: number,
+): number {
+  if (oppositePort(sourcePort) !== targetPort) return requested;
+  const sourceVector = portVector(sourcePort);
+  const separation = sourceVector.x !== 0
+    ? (target.x - source.x) * sourceVector.x
+    : (target.y - source.y) * sourceVector.y;
+  return separation < 0 ? requested : Math.min(requested, separation / 2);
+}
+
 /**
  * Resolve a product-authored orthogonal corridor into the compiler's one final
  * route geometry. The route remains anchored to the allocated rectangle ports
@@ -229,13 +264,20 @@ export function applyOrthogonalRouteConstraint(
 ): OrthogonalRoute {
   const sourceVector = portVector(route.sourcePort);
   const targetVector = portVector(route.targetPort);
+  const resolvedStub = facingStubDistance(
+    route.source,
+    route.target,
+    route.sourcePort,
+    route.targetPort,
+    stub,
+  );
   const sourceStub = {
-    x: route.source.x + sourceVector.x * stub,
-    y: route.source.y + sourceVector.y * stub,
+    x: route.source.x + sourceVector.x * resolvedStub,
+    y: route.source.y + sourceVector.y * resolvedStub,
   };
   const targetStub = {
-    x: route.target.x + targetVector.x * stub,
-    y: route.target.y + targetVector.y * stub,
+    x: route.target.x + targetVector.x * resolvedStub,
+    y: route.target.y + targetVector.y * resolvedStub,
   };
   const corridor = constraint.axis === "x"
     ? [
@@ -249,7 +291,7 @@ export function applyOrthogonalRouteConstraint(
   const { fallbackReason: _fallbackReason, jumps: _jumps, ...base } = route;
   return {
     ...base,
-    points: compactOrthogonalPoints([
+    points: compactConstrainedPoints([
       route.source,
       sourceStub,
       ...corridor,
@@ -273,8 +315,15 @@ function simpleOrthogonalPoints(
   stub: number,
 ): Point[] {
   const detour = stub + 12;
-  const sourceStub = pointOutside(source, sourcePort, stub);
-  const targetStub = pointOutside(target, targetPort, stub);
+  const resolvedStub = facingStubDistance(
+    source,
+    target,
+    sourcePort,
+    targetPort,
+    stub,
+  );
+  const sourceStub = pointOutside(source, sourcePort, resolvedStub);
+  const targetStub = pointOutside(target, targetPort, resolvedStub);
   const sourceHorizontal = sourcePort === "left" || sourcePort === "right";
   const targetHorizontal = targetPort === "left" || targetPort === "right";
   const sourceVector = portVector(sourcePort);
@@ -412,8 +461,15 @@ function obstacleAvoidingPoints(
   if (obstacleNodes.length === 0 || obstacleNodes.length > maximumObstacles) {
     return undefined;
   }
-  const sourceStub = pointOutside(source, sourcePort, stub);
-  const targetStub = pointOutside(target, targetPort, stub);
+  const resolvedStub = facingStubDistance(
+    source,
+    target,
+    sourcePort,
+    targetPort,
+    stub,
+  );
+  const sourceStub = pointOutside(source, sourcePort, resolvedStub);
+  const targetStub = pointOutside(target, targetPort, resolvedStub);
   const obstacles = expandObstacles(obstacleNodes, clearance);
   if (obstacles.some((obstacle) => pointInsideObstacle(sourceStub, obstacle)) ||
       obstacles.some((obstacle) => pointInsideObstacle(targetStub, obstacle))) {
@@ -755,14 +811,21 @@ function attemptOrthogonalRoute(
     : obstacleNodes;
   const expanded = expandObstacles(selected, clearance);
   const simplePoints = simpleOrthogonalPoints(source, target, source.side, target.side, stub);
+  const resolvedStub = facingStubDistance(
+    source,
+    target,
+    source.side,
+    target.side,
+    stub,
+  );
   // An empty selection only means "clear" when there was nothing to avoid;
   // an exhausted budget is degradation, not clearance.
   const clear = selected.length === 0
     ? obstacleNodes.length === 0
     : simpleRouteIsClear(
         simplePoints,
-        pointOutside(source, source.side, stub),
-        pointOutside(target, target.side, stub),
+        pointOutside(source, source.side, resolvedStub),
+        pointOutside(target, target.side, resolvedStub),
         expanded,
       );
   const avoiding = selected.length > 0 && !clear

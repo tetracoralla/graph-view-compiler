@@ -1,5 +1,6 @@
 import {
   compileGraphView,
+  type EdgeRouteConstraints,
   type SemanticGraphV1,
 } from "@openadam/graph-view-compiler/compiler";
 
@@ -44,6 +45,30 @@ const plan = compileGraphView({
   },
 });
 
+const edgeRouteConstraints: EdgeRouteConstraints = Object.fromEntries(
+  graph.relations.map((relation, index) => [relation.id, {
+    type: "orthogonal-corridor" as const,
+    axis: "y" as const,
+    coordinate: 110 + index * 24,
+  }]),
+);
+const constrainedPlan = compileGraphView({
+  graph,
+  nodeSizes: Object.fromEntries(tasks.map((task) => [
+    task.key,
+    { width: Math.max(120, task.title.length * 10 + 32), height: 52 },
+  ])),
+  profile: {
+    type: "fixed",
+    positions: {
+      contract: { x: 0, y: 0 },
+      client: { x: 240, y: 0 },
+      release: { x: 480, y: 0 },
+    },
+  },
+  edgeRouteConstraints,
+});
+
 if (plan.nodes.length !== 3 || plan.edges.length !== 2) {
   throw new Error("Independent consumer received an incomplete view plan");
 }
@@ -52,6 +77,11 @@ if (!plan.nodes.every((node) => plan.membership.nodes[node.id]?.includes(node.id
 }
 if (!plan.quality.complete) {
   throw new Error("Small independent fixture should receive a complete inspection");
+}
+if (!constrainedPlan.edges.every((edge) =>
+  edge.route.strategy === "constrained" &&
+  edge.route.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)))) {
+  throw new Error("Independent consumer did not receive finite constrained routes");
 }
 
 console.log(JSON.stringify({

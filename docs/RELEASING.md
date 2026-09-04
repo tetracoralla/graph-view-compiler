@@ -47,7 +47,10 @@ set npm publishing access to require 2FA and disallow traditional tokens.
 ## Later releases
 
 1. Update the version and changelog.
-2. Run `npm run check` and review `npm pack --dry-run`.
+2. Replace the changelog's `Unreleased` marker with the intended UTC release
+   date, update README install examples to the exact package version, run
+   `npm run check` and `npm run check:publication`, and review
+   `npm pack --dry-run`.
 3. Commit and push the reviewed source to `main`.
 4. Run the repository's `Release package` workflow with the exact package
    version. The workflow refuses a mismatched version and publishes from the

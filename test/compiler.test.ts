@@ -239,6 +239,174 @@ describe("graph view compiler", () => {
     expect(filtered.edges.map((edge) => edge.id)).toEqual(["bc"]);
   });
 
+  it("treats prototype-shaped ids as own keys across compiler input maps", () => {
+    const graph: SemanticGraphV1 = {
+      version: 1,
+      nodes: [{ id: "__proto__" }, { id: "constructor" }],
+      relations: [{
+        id: "toString",
+        source: "__proto__",
+        target: "constructor",
+        direction: "directed",
+        label: "opaque",
+      }],
+    };
+    const nodeSizes = Object.fromEntries(graph.nodes.map((node) => [
+      node.id,
+      { width: 80, height: 40 },
+    ]));
+    const positions = Object.fromEntries([
+      ["__proto__", { x: 0, y: 0 }],
+      ["constructor", { x: 300, y: 0 }],
+    ]);
+    const labelSizes = Object.fromEntries([
+      ["toString", { width: 72, height: 18 }],
+    ]);
+    const base = {
+      graph,
+      nodeSizes,
+      labelSizes,
+      edgeWeights: {},
+      profile: { type: "fixed" as const, positions },
+    };
+
+    const automatic = compileGraphView({ ...base, edgeRouteConstraints: {} });
+    expect(automatic.edges[0]?.route.strategy).not.toBe("constrained");
+    expect(automatic.edges[0]?.route.points.flatMap(({ x, y }) => [x, y])
+      .every(Number.isFinite)).toBe(true);
+    expect(automatic.edges[0]?.label).toMatchObject({ width: 72, height: 18 });
+
+    const constrained = compileGraphView({
+      ...base,
+      edgeRouteConstraints: Object.fromEntries([[
+        "toString",
+        { type: "orthogonal-corridor", axis: "y", coordinate: 120 },
+      ]]),
+    });
+    expect(constrained.edges[0]?.route.strategy).toBe("constrained");
+    expect(constrained.edges[0]?.route.points).toContainEqual({ x: 110, y: 120 });
+
+    expect(() => compileGraphView({
+      ...base,
+      labelSizes: {},
+    })).toThrow(expect.objectContaining({
+      issues: [expect.objectContaining({ code: "missing_label_size", id: "toString" })],
+    }));
+    expect(() => compileGraphView({
+      ...base,
+      nodeSizes: {},
+    })).toThrow(expect.objectContaining({
+      issues: expect.arrayContaining([
+        expect.objectContaining({ code: "invalid_input", id: "__proto__" }),
+        expect.objectContaining({ code: "invalid_input", id: "constructor" }),
+      ]),
+    }));
+    expect(() => compileGraphView({
+      ...base,
+      profile: { type: "fixed", positions: {} },
+    })).toThrow(expect.objectContaining({
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "invalid_projection",
+          id: "__proto__",
+          causeCode: "missing_position",
+        }),
+        expect.objectContaining({
+          code: "invalid_projection",
+          id: "constructor",
+          causeCode: "missing_position",
+        }),
+      ]),
+    }));
+  });
+
+  it("keeps constrained routes on allocated ports without discarded automatic routing", () => {
+    const nodeCount = 12;
+    const graph: SemanticGraphV1 = {
+      version: 1,
+      nodes: Array.from({ length: nodeCount }, (_, index) => ({ id: `n-${index}` })),
+      relations: Array.from({ length: nodeCount - 1 }, (_, index) => ({
+        id: `e-${index}`,
+        source: `n-${index}`,
+        target: `n-${index + 1}`,
+        direction: "directed" as const,
+      })),
+    };
+    const plan = compileGraphView({
+      graph,
+      nodeSizes: Object.fromEntries(
+        graph.nodes.map((node) => [node.id, { width: 120, height: 52 }]),
+      ),
+      profile: {
+        type: "fixed",
+        positions: Object.fromEntries(
+          graph.nodes.map((node, index) => [
+            node.id,
+            { x: (index % 4) * 160, y: Math.floor(index / 4) * 92 },
+          ]),
+        ),
+      },
+      edgeRouteConstraints: {
+        "e-3": { type: "orthogonal-corridor", axis: "y", coordinate: 250 },
+      },
+    });
+    const constrained = plan.edges.find((edge) => edge.id === "e-3")?.route;
+
+    expect(constrained).toMatchObject({
+      strategy: "constrained",
+      sourcePort: "left",
+      targetPort: "right",
+    });
+    expect(constrained?.points).toEqual(expect.arrayContaining([
+      { x: 450, y: 35 },
+      { x: 150, y: 109 },
+    ]));
+  });
+
+  it("reports a constrained route that re-enters an endpoint node", () => {
+    const plan = compileGraphView({
+      graph: {
+        version: 1,
+        nodes: [
+          { id: "source", ports: [{ id: "out", preferredSide: "right" }] },
+          { id: "target", ports: [{ id: "in", preferredSide: "left" }] },
+        ],
+        relations: [{
+          id: "route",
+          source: "source",
+          target: "target",
+          sourcePort: "out",
+          targetPort: "in",
+          direction: "directed",
+        }],
+      },
+      nodeSizes: {
+        source: { width: 80, height: 40 },
+        target: { width: 80, height: 40 },
+      },
+      profile: {
+        type: "fixed",
+        positions: { source: { x: 0, y: 0 }, target: { x: 320, y: 200 } },
+      },
+      edgeRouteConstraints: {
+        route: { type: "orthogonal-corridor", axis: "x", coordinate: 0 },
+      },
+    });
+    const route = plan.edges[0]?.route;
+
+    expect(route?.points.slice(0, 3)).toEqual([
+      expect.objectContaining({ x: 80, y: 20 }),
+      { x: 110, y: 20 },
+      { x: 0, y: 20 },
+    ]);
+    expect(plan.quality.edgeNodeIntersections).toBeGreaterThan(0);
+    expect(plan.diagnostics).toContainEqual(expect.objectContaining({
+      code: "edge_node_intersection",
+      viewIds: ["route", "source"],
+      sourceIds: ["route", "source"],
+    }));
+  });
+
   it("normalizes shuffled source input into the same deterministic plan", () => {
     const input: Omit<CompileGraphViewInput, "graph"> = {
       nodeSizes: sizes,

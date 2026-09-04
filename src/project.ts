@@ -71,7 +71,15 @@ function assertEdgeRouteConstraints(
       message: "Edge route constraints must be an object keyed by edge id",
     }]);
   }
-  for (const [edgeId, candidate] of Object.entries(value)) {
+  const entries = Object.entries(value);
+  if (entries.length > graph.edges.length) {
+    throw new GraphProjectionError([{
+      code: "invalid_route_constraint",
+      id: "edgeRouteConstraints",
+      message: `Edge route constraints contain ${entries.length} entries for ${graph.edges.length} edges`,
+    }]);
+  }
+  for (const [edgeId, candidate] of entries) {
     if (!edgeIds.has(edgeId)) {
       issues.push({
         code: "unknown_route_constraint",
@@ -162,21 +170,28 @@ function projectPositionedGraph(
     const source = ports.get(`${edge.id}:source`);
     const target = ports.get(`${edge.id}:target`);
     if (!sourceNode || !targetNode || !source || !target) return [];
-    const automaticRoute = routeOrthogonalBetweenPortsWithRetries(
-      sourceNode,
-      targetNode,
-      source,
-      target,
-      { obstacles: nodes, ...safeRouting },
-      {
-        source: edge.sourcePort === undefined,
-        target: edge.targetPort === undefined,
-      },
-    );
-    const constraint = edgeRouteConstraints[edge.id];
+    const constraint = Object.hasOwn(edgeRouteConstraints, edge.id)
+      ? edgeRouteConstraints[edge.id]
+      : undefined;
     const route = constraint === undefined
-      ? automaticRoute
-      : applyOrthogonalRouteConstraint(automaticRoute, constraint, safeRouting.stub ?? 30);
+      ? routeOrthogonalBetweenPortsWithRetries(
+          sourceNode,
+          targetNode,
+          source,
+          target,
+          { obstacles: nodes, ...safeRouting },
+          {
+            source: edge.sourcePort === undefined,
+            target: edge.targetPort === undefined,
+          },
+        )
+      : applyOrthogonalRouteConstraint({
+          source,
+          target,
+          sourcePort: source.side,
+          targetPort: target.side,
+          points: [source, target],
+        }, constraint, safeRouting.stub ?? 30);
     const midpoint = routeMidpoint(route);
     const labelWidth = edge.labelWidth ??
       (edge.label ? Math.min(160, Math.max(24, edge.label.length * 12)) : 0);
@@ -265,7 +280,9 @@ export function projectFixedGraph(
   assertEdgeRouteConstraints(graph, options.edgeRouteConstraints);
   const issues: ProjectionIssue[] = [];
   const nodes = graph.nodes.flatMap((node) => {
-    const position = options.positions[node.id];
+    const position = Object.hasOwn(options.positions, node.id)
+      ? options.positions[node.id]
+      : undefined;
     if (position === undefined) {
       issues.push({
         code: "missing_position",

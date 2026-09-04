@@ -40,16 +40,17 @@ The command builds current source and reports one JSON observation containing:
 - packed and unpacked package bytes and file count;
 - whole-process cold imports for `/semantic`, `/compiler`, and the full entry;
 - median and p95 compile time, serialized plan bytes, and output SHA-256 for
-  the same 100-node chain under layered and caller-positioned profiles, a
+  the same 100-node chain under layered, caller-positioned, and fully
+  constrained caller-positioned profiles, a
   250-node layered fan, a 500-node caller-positioned chain, a 45-node
   caller-positioned chain that exercises obstacle-aware routing, and a
   1,000-node layered chain at the layout depth boundary.
 
 Each case runs five times and fails if its serialized output hash changes
-between repetitions. The obstacle-aware case fails if no edge reports the
-`obstacle-avoiding` strategy, so the measured suite cannot silently skip the
-routing path it claims to measure. The timing values are deliberately not a
-mechanical gate: compare the same fixture, machine, Node.js version, and
+between repetitions. The obstacle-aware and constrained cases also fail if
+their expected strategies are absent, so the measured suite cannot silently
+skip the routing path it claims to measure. The timing values are deliberately
+not a mechanical gate: compare the same fixture, machine, Node.js version, and
 warm/cold condition before making a regression claim.
 
 Package inventory and the independent typed consumer remain enforced by

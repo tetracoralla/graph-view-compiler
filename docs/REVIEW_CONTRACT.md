@@ -11,8 +11,9 @@ Before release or consumer migration, independently verify current source and:
 4. ports landing on rectangle-side boundaries;
 5. obstacle avoidance, route determinism, crossings, and degenerate inputs;
 6. fixed-view corridor constraints, including final points, endpoint stubs,
+   close opposite-facing ports, endpoint re-entry, allocated-side stability,
    crossing bridges, bounds, collision diagnostics, malformed input, hidden
-   source relations, and unknown relation ids;
+   source relations, unknown relation ids, and prototype-shaped opaque ids;
 7. dependency-role mapping from prerequisite to dependent;
 8. package exports, declarations, legal inventory, examples, and an isolated packed
    install that cannot resolve a sibling checkout;

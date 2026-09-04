@@ -32,4 +32,5 @@ jobs:
         run: |
           test "$REQUESTED_VERSION" = "$(node -p "require('./package.json').version")"
       - run: npm run check
+      - run: npm run check:publication
       - run: npm publish --access public

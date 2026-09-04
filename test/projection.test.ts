@@ -221,6 +221,16 @@ describe("versioned semantic graph", () => {
     ]);
     expect(collapsed.nodeMembers["__proto__"]).toEqual(["a", "constructor"]);
     expect(collapsed.absorbedRelationIds).toEqual(["toString"]);
+    expect(() => semanticGraphToProjectionGraph({
+      version: 1,
+      nodes: [{ id: "constructor" }],
+      relations: [],
+    }, { nodeSizes: {} })).toThrow(expect.objectContaining({
+      issues: [expect.objectContaining({
+        code: "missing_node_size",
+        id: "constructor",
+      })],
+    }));
 
     const leftNode: NodeBox = { id: "left", x: 0, y: 100, width: 196, height: 54 };
     const rightNode: NodeBox = { id: "right", x: 620, y: 100, width: 196, height: 54 };

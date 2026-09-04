@@ -67,6 +67,7 @@
     "test": "vitest run",
     "check:examples": "node scripts/check-examples.mjs",
     "check:release": "node scripts/check-release.mjs",
+    "check:publication": "node scripts/check-publication.mjs",
     "check:packed-install": "node scripts/check-packed-install.mjs",
     "measure:compiler": "npm run build && node scripts/measure-compiler.mjs",
     "sync:consumers": "node scripts/sync-consumers.mjs",

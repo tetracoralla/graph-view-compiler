@@ -683,7 +683,9 @@ export function projectNormalizedSemanticGraph(
   const problems: SemanticGraphIssue[] = [];
   const nodeById = new Map(normalized.nodes.map((node) => [node.id, node]));
   const nodes = normalized.nodes.flatMap((node) => {
-    const size = options.nodeSizes[node.id];
+    const size = Object.hasOwn(options.nodeSizes, node.id)
+      ? options.nodeSizes[node.id]
+      : undefined;
     if (size === undefined) {
       problems.push(issue("missing_node_size", node.id, `Missing projection size for node ${node.id}`));
       return [];
@@ -701,7 +703,10 @@ export function projectNormalizedSemanticGraph(
     edges: normalized.relations.map((relation) => {
       const sourcePort = portSide(relation.source, relation.sourcePort);
       const targetPort = portSide(relation.target, relation.targetPort);
-      const labelSize = options.labelSizes?.[relation.id];
+      const labelSize = options.labelSizes !== undefined &&
+          Object.hasOwn(options.labelSizes, relation.id)
+        ? options.labelSizes[relation.id]
+        : undefined;
       return {
         id: relation.id,
         source: relation.source,

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 - Unreleased
+## 0.5.0 - 2026-09-04
 
 - Add finite per-relation `orthogonal-corridor` constraints for fixed-position
   views. The compiler resolves them into the one final orthogonal route while
@@ -12,6 +12,15 @@
   relations hidden by ordered passes.
 - Expose `constrained` as an explicit route strategy. A manual corridor records
   user geometry authority and does not claim automatic obstacle avoidance.
+- Keep constrained routes on the allocator's port sides without paying for or
+  inheriting discarded automatic obstacle routing. Shorten opposite-facing
+  endpoint stubs when the available gap is smaller than the configured pair,
+  and report manual routes that re-enter an endpoint node.
+- Treat prototype-shaped graph ids as opaque own keys across measurements,
+  positions, weights, and route constraints instead of reading inherited
+  object properties as product data.
+- Exercise the fixed constrained compiler contract through the isolated typed
+  packed consumer and the deterministic performance measurement.
 
 ## 0.4.0 - 2026-09-03
 

@@ -232,11 +232,11 @@ function validateEdgeRouteConstraints(value: unknown): readonly GraphViewCompile
   const issues: GraphViewCompileIssue[] = [];
   const entries = Object.entries(value);
   if (entries.length > MAX_SEMANTIC_RELATIONS) {
-    issues.push(issue(
+    return [issue(
       "invalid_edge_route_constraint",
       "edgeRouteConstraints",
       `Edge route constraints may contain at most ${MAX_SEMANTIC_RELATIONS} entries`,
-    ));
+    )];
   }
   for (const [edgeId, candidate] of entries) {
     if (!isIdentifier(edgeId) || !isRecord(candidate) ||
@@ -690,7 +690,8 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
     throw error;
   }
   const missingLabelSizes = compiled.graph.relations
-    .filter((relation) => relation.label !== undefined && input.labelSizes?.[relation.id] === undefined)
+    .filter((relation) => relation.label !== undefined &&
+      (input.labelSizes === undefined || !Object.hasOwn(input.labelSizes, relation.id)))
     .map((relation) => issue(
       "missing_label_size",
       relation.id,
@@ -698,7 +699,7 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
     ));
   if (missingLabelSizes.length > 0) throw new GraphViewCompileError(missingLabelSizes);
   const missingNodeSizes = compiled.graph.nodes
-    .filter((node) => input.nodeSizes[node.id] === undefined)
+    .filter((node) => !Object.hasOwn(input.nodeSizes, node.id))
     .map((node) => issue(
       "invalid_input",
       node.id,
@@ -713,7 +714,7 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
     ...projectionBase,
     edges: projectionBase.edges.map((edge) => ({
       ...edge,
-      ...(input.edgeWeights?.[edge.id] === undefined
+      ...(input.edgeWeights === undefined || !Object.hasOwn(input.edgeWeights, edge.id)
         ? {}
         : { weight: input.edgeWeights[edge.id] }),
     })),
@@ -831,6 +832,8 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
 export { SemanticGraphError } from "./semantic-graph.js";
 export { GraphProjectionError } from "./semantics.js";
 export type {
+  EdgeRouteConstraint,
+  EdgeRouteConstraints,
   LayeredLayoutOptions,
   Point,
   SemanticGraphFilter,

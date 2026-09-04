@@ -99,17 +99,20 @@ export function inspectRoutedGraphDetails(
           viewIds: [edge.id],
         });
       }
-      nodes.filter((node) => node.id !== edge.sourceId && node.id !== edge.targetId)
-        .forEach((node) => {
-          if (!segmentIntersectsNode(previous, point, node)) return;
-          edgeNodeIntersections += 1;
-          const viewIds = [edge.id, node.id].sort(compareGraphIds);
-          addDiagnostic({
-            code: "edge_node_intersection",
-            message: `Edge ${edge.id} intersects node ${node.id}`,
-            viewIds,
-          });
+      // Boundary contact at the first and last point is excluded by the
+      // strict interior check in segmentIntersectsNode. Inspect endpoint nodes
+      // too so a persisted manual corridor that re-enters either node is not
+      // incorrectly reported as collision-free.
+      nodes.forEach((node) => {
+        if (!segmentIntersectsNode(previous, point, node)) return;
+        edgeNodeIntersections += 1;
+        const viewIds = [edge.id, node.id].sort(compareGraphIds);
+        addDiagnostic({
+          code: "edge_node_intersection",
+          message: `Edge ${edge.id} intersects node ${node.id}`,
+          viewIds,
         });
+      });
     });
   });
   for (let leftIndex = 0; leftIndex < edges.length; leftIndex += 1) {

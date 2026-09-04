@@ -116,6 +116,14 @@ const fan250 = fanGraph(250);
 const chain500 = chainGraph(500);
 const chain1000 = chainGraph(1000);
 const rowJump45 = rowJumpGraph(45, 6);
+const constrainedChain100 = Object.fromEntries(chain100.relations.map((relation, index) => [
+  relation.id,
+  {
+    type: "orthogonal-corridor",
+    axis: "y",
+    coordinate: -80 - (index % 5) * 24,
+  },
+]));
 const cases = [
   measureCase("layered-chain-100", {
     graph: chain100,
@@ -126,6 +134,23 @@ const cases = [
     graph: chain100,
     nodeSizes: nodeSizes(chain100),
     profile: { type: "fixed", positions: fixedPositions(chain100) },
+  }),
+  measureCase("caller-positioned-constrained-chain-100", {
+    graph: chain100,
+    nodeSizes: nodeSizes(chain100),
+    profile: {
+      type: "fixed",
+      positions: Object.fromEntries(chain100.nodes.map((node, index) => [
+        node.id,
+        { x: index * 180, y: 0 },
+      ])),
+    },
+    edgeRouteConstraints: constrainedChain100,
+  }, 5, (plan) => {
+    assert.ok(
+      plan.edges.every((edge) => edge.route.strategy === "constrained"),
+      "expected every measured edge to use its caller-authored corridor",
+    );
   }),
   measureCase("layered-fan-250", {
     graph: fan250,

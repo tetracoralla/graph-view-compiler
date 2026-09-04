@@ -32,7 +32,8 @@ as source of truth.
 - deterministic derived semantic subgraphs and explicit collapse membership;
 - deterministic node rectangles;
 - boundary ports and final orthogonal route points, including product-authored
-  corridors resolved into endpoint stubs;
+  corridors resolved into endpoint stubs bounded by the available
+  opposite-facing port gap;
 - endpoint styles derived from relation direction;
 - label anchor candidates and bounded geometric quality observations;
 - ordered pass traces, source membership, exact view bounds, change

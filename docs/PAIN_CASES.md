@@ -4,7 +4,7 @@ This matrix turns recurring public integration complaints into falsifiable
 compiler scenarios. Linked issue reports are demand observations, not proof that
 the compiler solves every case or that another project is categorically worse.
 
-| Recurring pain | Current 0.4 contract | Executable check | Honest boundary |
+| Recurring pain | Current 0.5 contract | Executable check | Honest boundary |
 | --- | --- | --- | --- |
 | Dynamic or direction-dependent handles after layout ([React Flow #1303](https://github.com/xyflow/xyflow/issues/1303), [#935](https://github.com/xyflow/xyflow/issues/935)) | Semantic ports retain explicit ids and preferred rectangle sides; the projection allocates exact boundary points. | Port validation, semantic-to-projection mapping, and tied port allocation tests. | The product renderer still owns handle components and interaction. |
 | Fitting a view after asynchronous layout ([React Flow #4801](https://github.com/xyflow/xyflow/issues/4801)) | Every plan returns bounds covering nodes, routes, and measured labels. | Fixed negative-position and measured-label bounds tests. | Camera animation and viewport fitting remain product-owned. |
@@ -14,6 +14,7 @@ the compiler solves every case or that another project is categorically worse.
 | Group/subgraph regressions ([Mermaid #8066](https://github.com/mermaid-js/mermaid/issues/8066)) | Grouping and collapse are explicit ordered passes with composed source-node and source-relation membership. | Group-then-collapse compiler test and semantic collapse provenance test. | Expanded compound-group placement is not claimed. |
 | Layout updates destroy the reader's mental anchor | A new layered plan can align one retained node to its previous coordinates and reports every added, removed, moved, and rerouted object. | Previous-plan anchor and change-reconciliation test. | This is anchor preservation, not a claim of optimal incremental layout for every retained node. |
 | A product already owns node positions | The fixed profile preserves those positions and still supplies shared ports, routes, bounds, membership, change information, and diagnostics. | Fixed-profile routing and unrelated typed-consumer checks. | The compiler does not overwrite product-owned placement or camera state. |
+| A human adjusts one connector without adopting a shared renderer | A fixed view accepts one finite axis-aligned corridor per source relation, preserves allocated port sides, and derives final points, bridges, labels, bounds, changes, and diagnostics from it. | Constrained final-geometry, close-port, endpoint re-entry, hidden-relation, opaque-id, and packed-consumer checks. | The corridor records arrangement intent; it does not promise obstacle avoidance or own editing interaction and persistence. |
 
 New claims belong here only after a current reproducer and a supported, rejected,
 or explicitly bounded executable outcome exist.
