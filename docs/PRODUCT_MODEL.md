@@ -1,6 +1,6 @@
 # Product model
 
-Status: current implemented 0.4 boundary. The owner-confirmed target is defined
+Status: current implemented 0.5 boundary. The owner-confirmed target is defined
 in the [North star](NORTH_STAR.md); target capabilities are not current-release
 claims.
 
@@ -21,13 +21,18 @@ as source of truth.
 - optional preferred ports, labels, weights, and already positioned nodes;
 - layered or fixed-position projection profile, bounded layout and routing
   options, and an optional prior view plan for explicit anchor stability;
+- for fixed-position views, optional finite `orthogonal-corridor` constraints
+  keyed by stable source relation id; a constraint for a relation hidden by an
+  ordered pass is omitted from that compiled view without destroying product
+  arrangement state;
 - at most 2,000 nodes and 8,000 edges in one portable projection call.
 
 ## Owned outputs
 
 - deterministic derived semantic subgraphs and explicit collapse membership;
 - deterministic node rectangles;
-- boundary ports and orthogonal route points;
+- boundary ports and final orthogonal route points, including product-authored
+  corridors resolved into endpoint stubs;
 - endpoint styles derived from relation direction;
 - label anchor candidates and bounded geometric quality observations;
 - ordered pass traces, source membership, exact view bounds, change

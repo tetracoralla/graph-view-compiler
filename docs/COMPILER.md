@@ -1,8 +1,10 @@
 # Graph view compiler contract
 
 Version 0.3 introduced the high-level `compileGraphView` entry point. Version
-0.4 hardens its deterministic routing, bounded diagnostics, and unified error
-surface. It converts a
+0.4 hardened its deterministic routing, bounded diagnostics, and unified error
+surface. Version 0.5 adds a narrow fixed-view input for product-authored
+orthogonal corridors while keeping the compiler authoritative for final
+geometry. It converts a
 versioned semantic graph into a renderer-neutral 2D view plan without taking
 ownership of the product's source graph, renderer, style, camera, interaction,
 or persistence.
@@ -25,7 +27,8 @@ One compile call has these stages:
 2. run zero or more named passes in caller order;
 3. map the resulting semantic objects to measured node dimensions;
 4. apply one explicit projection profile;
-5. allocate boundary ports and route relations;
+5. allocate boundary ports, route relations, and apply any fixed-view corridor
+   constraints;
 6. optionally align a layered result to one retained node in a previous plan;
 7. report bounds, membership, changes, geometric quality, and diagnostics.
 
@@ -82,6 +85,32 @@ corridor from any eligible side; a zero budget is reported as
 intersection that remains is reported by the quality metrics and
 `edge_node_intersection` diagnostics when detailed inspection fits its own
 declared work budget.
+
+Fixed-position views may additionally provide `edgeRouteConstraints`, keyed by
+stable source relation id. Version 0.5 supports one deliberately narrow shape:
+
+```ts
+edgeRouteConstraints: {
+  relationId: {
+    type: "orthogonal-corridor",
+    axis: "x",
+    coordinate: 240,
+  },
+}
+```
+
+The compiler keeps the allocated boundary ports, adds the configured routing
+stub, resolves the corridor into a final orthogonal point sequence, and marks
+the route strategy as `constrained`. Crossing bridges, labels, bounds, change
+reconciliation, and all geometry diagnostics are computed from those final
+points. A constrained route expresses user placement and therefore does not
+claim automatic obstacle avoidance; intersections remain visible through the
+normal diagnostics. Unknown source relation ids and malformed constraints are
+typed failures. A valid constraint for a source relation hidden by an ordered
+pass is ignored for that view, so products need not destroy saved arrangement
+state while filtering. Constraints are rejected for layered profiles because
+their absolute coordinate system is compiler-generated rather than
+product-authoritative.
 
 Eligible unrelated route crossings are bridged with non-overlapping jump arcs
 in the generated path and exposed as `route.jumps` when the conservative

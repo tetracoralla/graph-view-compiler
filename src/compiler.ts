@@ -25,7 +25,9 @@ import {
   MAX_PROJECTION_EDGES,
   MAX_PROJECTION_NODES,
   MAX_SEMANTIC_NODES,
+  MAX_SEMANTIC_RELATIONS,
   type CollapsedSemanticGraph,
+  type EdgeRouteConstraints,
   type LayeredLayoutOptions,
   type NodeBox,
   type Point,
@@ -216,6 +218,61 @@ function validateRouting(value: unknown): readonly GraphViewCompileIssue[] {
     ));
   }
   return issues;
+}
+
+function validateEdgeRouteConstraints(value: unknown): readonly GraphViewCompileIssue[] {
+  if (value === undefined) return [];
+  if (!isRecord(value)) {
+    return [issue(
+      "invalid_edge_route_constraint",
+      "edgeRouteConstraints",
+      "Edge route constraints must be an object keyed by source relation id",
+    )];
+  }
+  const issues: GraphViewCompileIssue[] = [];
+  const entries = Object.entries(value);
+  if (entries.length > MAX_SEMANTIC_RELATIONS) {
+    issues.push(issue(
+      "invalid_edge_route_constraint",
+      "edgeRouteConstraints",
+      `Edge route constraints may contain at most ${MAX_SEMANTIC_RELATIONS} entries`,
+    ));
+  }
+  for (const [edgeId, candidate] of entries) {
+    if (!isIdentifier(edgeId) || !isRecord(candidate) ||
+        !hasOnlyKeys(candidate, ["type", "axis", "coordinate"]) ||
+        candidate.type !== "orthogonal-corridor" ||
+        (candidate.axis !== "x" && candidate.axis !== "y") ||
+        typeof candidate.coordinate !== "number" || !Number.isFinite(candidate.coordinate)) {
+      issues.push(issue(
+        "invalid_edge_route_constraint",
+        edgeId,
+        `Edge ${edgeId} requires a finite orthogonal-corridor constraint`,
+      ));
+    }
+  }
+  return issues;
+}
+
+function activeEdgeRouteConstraints(
+  value: EdgeRouteConstraints | undefined,
+  sourceRelationIds: ReadonlySet<string>,
+  projectedEdgeIds: ReadonlySet<string>,
+): EdgeRouteConstraints {
+  if (value === undefined) return {};
+  const unknown = Object.keys(value)
+    .filter((edgeId) => !sourceRelationIds.has(edgeId))
+    .sort(compareGraphIds);
+  if (unknown.length > 0) {
+    throw new GraphViewCompileError(unknown.map((edgeId) => issue(
+      "unknown_edge_route_constraint",
+      edgeId,
+      `Edge route constraint refers to unknown source relation ${edgeId}`,
+    )));
+  }
+  return Object.fromEntries(Object.entries(value)
+    .filter(([edgeId]) => projectedEdgeIds.has(edgeId))
+    .sort(([left], [right]) => compareGraphIds(left, right)));
 }
 
 function validateStability(
@@ -581,6 +638,7 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
     ...validatePasses(candidate.passes),
     ...validateProfile(candidate.profile),
     ...validateRouting(candidate.routing),
+    ...validateEdgeRouteConstraints(candidate.edgeRouteConstraints),
     ...validatePreviousPlan(candidate.previousPlan),
     ...validateStability(candidate.stability, candidate.previousPlan),
   ];
@@ -611,6 +669,14 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
       "invalid_profile",
       "stability",
       "Fixed-position views already use authoritative positions and cannot be anchor-aligned",
+    ));
+  }
+  if (candidate.edgeRouteConstraints !== undefined &&
+      (!isRecord(candidate.profile) || candidate.profile.type !== "fixed")) {
+    problems.push(issue(
+      "invalid_edge_route_constraint",
+      "edgeRouteConstraints",
+      "Edge route constraints require the fixed-position profile",
     ));
   }
   if (problems.length > 0) throw new GraphViewCompileError(problems);
@@ -652,6 +718,11 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
         : { weight: input.edgeWeights[edge.id] }),
     })),
   };
+  const edgeRouteConstraints = activeEdgeRouteConstraints(
+    input.edgeRouteConstraints,
+    new Set(input.graph.relations.map((relation) => relation.id)),
+    new Set(projection.edges.map((edge) => edge.id)),
+  );
   const routing = sanitizedRouting(input.routing);
   const layout = input.profile.type === "layered"
     ? sanitizedLayout(input.profile.layout)
@@ -660,7 +731,11 @@ export function compileGraphView(input: CompileGraphViewInput): GraphViewPlanV1 
   try {
     projected = input.profile.type === "layered"
       ? projectLayeredGraph(projection, layout!, routing)
-      : projectFixedGraph(projection, { positions: input.profile.positions, routing });
+      : projectFixedGraph(projection, {
+          positions: input.profile.positions,
+          routing,
+          edgeRouteConstraints,
+        });
   } catch (error) {
     if (error instanceof GraphProjectionError) throw retypedCompileFailure("invalid_projection", error);
     throw error;

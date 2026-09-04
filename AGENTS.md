@@ -5,7 +5,7 @@
 adapt one authoritative
 typed graph into a versioned interchange graph, run explicit deterministic
 passes, and receive inspectable view plans and quality diagnostics without
-adopting a shared renderer. The current 0.4 implementation owns that compile
+adopting a shared renderer. The current 0.5 implementation owns that compile
 boundary for layered and caller-positioned 2D views. Do not stretch that claim
 to compound layout, arbitrary backends, or shared 3D.
 
@@ -21,6 +21,9 @@ Read `docs/NORTH_STAR.md` when planning product expansion and
   generic `source` and `target` fields are only introduced after that mapping.
 - Nodes connect at declared rectangle-side ports. Routes start and end exactly
   at those boundary points.
+- Fixed-position consumers may supply one bounded neutral corridor constraint
+  per source relation. The compiler remains the sole authority for final
+  orthogonal points, crossing bridges, bounds, and geometry diagnostics.
 - Layout and routing are deterministic for the same ordered input and options.
 - Semantic normalization, filtering, slicing, path enumeration, grouping, and
   collapse are deterministic; collapse returns explicit source membership.

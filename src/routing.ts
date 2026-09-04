@@ -1,4 +1,5 @@
 import type {
+  EdgeRouteConstraint,
   NodeBox,
   OrthogonalRoute,
   Point,
@@ -213,6 +214,50 @@ export function compactOrthogonalPoints(points: readonly Point[]): Point[] {
       Math.abs(point.y - next.y) < EPSILON;
     return !vertical && !horizontal;
   });
+}
+
+/**
+ * Resolve a product-authored orthogonal corridor into the compiler's one final
+ * route geometry. The route remains anchored to the allocated rectangle ports
+ * and keeps a short outward stub at each endpoint. Collision inspection and
+ * crossing bridges run later against these constrained points.
+ */
+export function applyOrthogonalRouteConstraint(
+  route: OrthogonalRoute,
+  constraint: EdgeRouteConstraint,
+  stub = 30,
+): OrthogonalRoute {
+  const sourceVector = portVector(route.sourcePort);
+  const targetVector = portVector(route.targetPort);
+  const sourceStub = {
+    x: route.source.x + sourceVector.x * stub,
+    y: route.source.y + sourceVector.y * stub,
+  };
+  const targetStub = {
+    x: route.target.x + targetVector.x * stub,
+    y: route.target.y + targetVector.y * stub,
+  };
+  const corridor = constraint.axis === "x"
+    ? [
+        { x: constraint.coordinate, y: sourceStub.y },
+        { x: constraint.coordinate, y: targetStub.y },
+      ]
+    : [
+        { x: sourceStub.x, y: constraint.coordinate },
+        { x: targetStub.x, y: constraint.coordinate },
+      ];
+  const { fallbackReason: _fallbackReason, jumps: _jumps, ...base } = route;
+  return {
+    ...base,
+    points: compactOrthogonalPoints([
+      route.source,
+      sourceStub,
+      ...corridor,
+      targetStub,
+      route.target,
+    ]),
+    strategy: "constrained",
+  };
 }
 
 function pointOutside(point: Point, port: PortSide, distance: number): Point {

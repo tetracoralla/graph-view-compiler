@@ -32,6 +32,12 @@ ordered-pass performance. `compileGraphView` now consistently throws
 `GraphProjectionError` from that high-level entry must migrate their catch
 logic. Low-level entry points retain their prior error classes.
 
+The 0.5 line keeps both format versions at 1 and adds optional fixed-view
+`orthogonal-corridor` constraints. Constrained routes add `constrained` to the
+route strategy union; products that exhaustively switch over strategy must add
+that explicit case. The compiler, not the consumer renderer, owns the final
+orthogonal points, crossing bridges, bounds, and diagnostics.
+
 Every release must pass:
 
 1. library typecheck, unit tests, build, legal and payload inventory;

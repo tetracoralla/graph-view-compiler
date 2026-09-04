@@ -190,8 +190,8 @@ export interface OrthogonalRoute {
   sourcePort: PortSide;
   targetPort: PortSide;
   points: Point[];
-  /** Set by this library: whether obstacle-aware routing produced the geometry. */
-  strategy?: "obstacle-avoiding" | "simple";
+  /** Set by this library: which authority produced the final geometry. */
+  strategy?: "obstacle-avoiding" | "simple" | "constrained";
   /**
    * Present only when a simple route was used as a bounded fallback. A simple
    * route without this field either had no obstacles in budget or already
@@ -205,6 +205,20 @@ export interface OrthogonalRoute {
    */
   jumps?: readonly RouteJump[];
 }
+
+/**
+ * A product-authored movable corridor for one otherwise automatic orthogonal
+ * route. The compiler retains authority for endpoint stubs, the final point
+ * sequence, crossing bridges, bounds, and geometric diagnostics.
+ */
+export interface OrthogonalCorridorConstraint {
+  type: "orthogonal-corridor";
+  axis: "x" | "y";
+  coordinate: number;
+}
+
+export type EdgeRouteConstraint = OrthogonalCorridorConstraint;
+export type EdgeRouteConstraints = Readonly<Record<string, EdgeRouteConstraint>>;
 
 export interface RouteJump extends Point {
   segmentIndex: number;
@@ -277,6 +291,8 @@ export interface ProjectionIssue {
     | "missing_target"
     | "missing_position"
     | "invalid_position"
+    | "invalid_route_constraint"
+    | "unknown_route_constraint"
     | "invalid_dimension"
     | "too_many_nodes"
     | "too_many_edges"

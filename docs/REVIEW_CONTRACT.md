@@ -10,12 +10,15 @@ Before release or consumer migration, independently verify current source and:
    undeclared options, and explicit inspection/routing budget diagnostics;
 4. ports landing on rectangle-side boundaries;
 5. obstacle avoidance, route determinism, crossings, and degenerate inputs;
-6. dependency-role mapping from prerequisite to dependent;
-7. package exports, declarations, legal inventory, examples, and an isolated packed
+6. fixed-view corridor constraints, including final points, endpoint stubs,
+   crossing bridges, bounds, collision diagnostics, malformed input, hidden
+   source relations, and unknown relation ids;
+7. dependency-role mapping from prerequisite to dependent;
+8. package exports, declarations, legal inventory, examples, and an isolated packed
    install that cannot resolve a sibling checkout;
-8. one unrelated typed consumer compiled and run against only the packed public
+9. one unrelated typed consumer compiled and run against only the packed public
    package;
-9. Calligram, Laniakea, and Dependency Engine adapters against their own
+10. Calligram, Laniakea, and Dependency Engine adapters against their own
    runtime regressions.
 
 Development checks do not establish visual acceptance. Consumer screenshots

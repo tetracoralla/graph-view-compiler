@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0 - Unreleased
+
+- Add finite per-relation `orthogonal-corridor` constraints for fixed-position
+  views. The compiler resolves them into the one final orthogonal route while
+  preserving allocated boundary ports and endpoint stubs.
+- Compute route crossing bridges, label anchors, view bounds, change
+  reconciliation, and collision diagnostics from constrained final geometry.
+- Reject malformed or unknown constraints with typed issues, reject constraints
+  for layered profiles, and safely ignore saved constraints for source
+  relations hidden by ordered passes.
+- Expose `constrained` as an explicit route strategy. A manual corridor records
+  user geometry authority and does not claim automatic obstacle avoidance.
+
 ## 0.4.0 - 2026-09-03
 
 - Reject layered graphs deeper than 1,000 ranks with a typed

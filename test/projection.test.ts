@@ -5,6 +5,7 @@ import {
   MAX_PROJECTION_EDGES,
   MAX_PROJECTION_NODES,
   MAX_SEMANTIC_PATH_STATES,
+  applyOrthogonalRouteConstraint,
   allocateRectanglePorts,
   dependencyRelationToProjectionEdge,
   endpointStylesForDirection,
@@ -325,6 +326,28 @@ describe("ports and routing", () => {
         Math.abs(previous.y - point.y) < 0.01;
     })).toBe(true);
     expect(roundedOrthogonalPath(route.points)).toMatch(/^M 196 127/);
+  });
+
+  it("turns one neutral corridor constraint into an orthogonal final route", () => {
+    const automatic = routeOrthogonal(left, right);
+    const constrained = applyOrthogonalRouteConstraint(automatic, {
+      type: "orthogonal-corridor",
+      axis: "y",
+      coordinate: 40,
+    });
+    expect(constrained.strategy).toBe("constrained");
+    expect(constrained.points).toEqual([
+      automatic.source,
+      { x: 226, y: 127 },
+      { x: 226, y: 40 },
+      { x: 590, y: 40 },
+      { x: 590, y: 127 },
+      automatic.target,
+    ]);
+    expect(constrained.points.slice(1).every((point, index) => {
+      const previous = constrained.points[index]!;
+      return previous.x === point.x || previous.y === point.y;
+    })).toBe(true);
   });
 
   it("routes around an unrelated node", () => {

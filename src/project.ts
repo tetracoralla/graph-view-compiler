@@ -1,5 +1,6 @@
 import { layoutLayeredGraph } from "./layered.js";
 import {
+  applyOrthogonalRouteConstraint,
   allocateRectanglePorts,
   jumpsForRoundedOrthogonalPath,
   pointOnRoute,
@@ -13,6 +14,7 @@ import {
   endpointStylesForDirection,
 } from "./semantics.js";
 import type {
+  EdgeRouteConstraints,
   EndpointStyles,
   LayeredLayoutOptions,
   NodeBox,
@@ -52,6 +54,46 @@ export type ProjectionRoutingOptions = Omit<
 export interface FixedProjectionOptions {
   positions: Readonly<Record<string, Point>>;
   routing?: ProjectionRoutingOptions;
+  edgeRouteConstraints?: EdgeRouteConstraints;
+}
+
+function assertEdgeRouteConstraints(
+  graph: ProjectionGraphV1,
+  value: unknown,
+): asserts value is EdgeRouteConstraints | undefined {
+  if (value === undefined) return;
+  const issues: ProjectionIssue[] = [];
+  const edgeIds = new Set(graph.edges.map((edge) => edge.id));
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new GraphProjectionError([{
+      code: "invalid_route_constraint",
+      id: "edgeRouteConstraints",
+      message: "Edge route constraints must be an object keyed by edge id",
+    }]);
+  }
+  for (const [edgeId, candidate] of Object.entries(value)) {
+    if (!edgeIds.has(edgeId)) {
+      issues.push({
+        code: "unknown_route_constraint",
+        id: edgeId,
+        message: `Edge route constraint refers to unknown edge ${edgeId}`,
+      });
+      continue;
+    }
+    if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate) ||
+        Object.keys(candidate).some((key) => !["type", "axis", "coordinate"].includes(key)) ||
+        (candidate as { type?: unknown }).type !== "orthogonal-corridor" ||
+        !["x", "y"].includes(String((candidate as { axis?: unknown }).axis)) ||
+        typeof (candidate as { coordinate?: unknown }).coordinate !== "number" ||
+        !Number.isFinite((candidate as { coordinate: number }).coordinate)) {
+      issues.push({
+        code: "invalid_route_constraint",
+        id: edgeId,
+        message: `Edge ${edgeId} requires a finite orthogonal-corridor constraint`,
+      });
+    }
+  }
+  if (issues.length > 0) throw new GraphProjectionError(issues);
 }
 
 function sanitizedRouting(options: ProjectionRoutingOptions): ProjectionRoutingOptions {
@@ -108,6 +150,7 @@ function projectPositionedGraph(
   graph: ProjectionGraphV1,
   nodes: readonly NodeBox[],
   routing: ProjectionRoutingOptions,
+  edgeRouteConstraints: EdgeRouteConstraints = {},
   dimensions?: { width: number; height: number },
 ): ProjectedGraph {
   const safeRouting = sanitizedRouting(routing);
@@ -119,7 +162,7 @@ function projectPositionedGraph(
     const source = ports.get(`${edge.id}:source`);
     const target = ports.get(`${edge.id}:target`);
     if (!sourceNode || !targetNode || !source || !target) return [];
-    const route = routeOrthogonalBetweenPortsWithRetries(
+    const automaticRoute = routeOrthogonalBetweenPortsWithRetries(
       sourceNode,
       targetNode,
       source,
@@ -130,6 +173,10 @@ function projectPositionedGraph(
         target: edge.targetPort === undefined,
       },
     );
+    const constraint = edgeRouteConstraints[edge.id];
+    const route = constraint === undefined
+      ? automaticRoute
+      : applyOrthogonalRouteConstraint(automaticRoute, constraint, safeRouting.stub ?? 30);
     const midpoint = routeMidpoint(route);
     const labelWidth = edge.labelWidth ??
       (edge.label ? Math.min(160, Math.max(24, edge.label.length * 12)) : 0);
@@ -205,6 +252,7 @@ export function projectLayeredGraph(
     graph,
     layered.nodes,
     routing,
+    {},
     { width: layered.width, height: layered.height },
   );
 }
@@ -214,6 +262,7 @@ export function projectFixedGraph(
   options: FixedProjectionOptions,
 ): ProjectedGraph {
   assertProjectionGraph(graph);
+  assertEdgeRouteConstraints(graph, options.edgeRouteConstraints);
   const issues: ProjectionIssue[] = [];
   const nodes = graph.nodes.flatMap((node) => {
     const position = options.positions[node.id];
@@ -239,5 +288,10 @@ export function projectFixedGraph(
   if (issues.length > 0) {
     throw new GraphProjectionError(issues);
   }
-  return projectPositionedGraph(graph, nodes, options.routing ?? {});
+  return projectPositionedGraph(
+    graph,
+    nodes,
+    options.routing ?? {},
+    options.edgeRouteConstraints,
+  );
 }

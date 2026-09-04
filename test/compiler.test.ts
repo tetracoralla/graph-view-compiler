@@ -102,6 +102,143 @@ describe("graph view compiler", () => {
     ]));
   });
 
+  it("makes a manual orthogonal corridor the one final route authority", () => {
+    const graph: SemanticGraphV1 = {
+      version: 1,
+      nodes: [{ id: "source" }, { id: "target" }],
+      relations: [{
+        id: "route",
+        source: "source",
+        target: "target",
+        direction: "directed",
+      }],
+    };
+    const plan = compileGraphView({
+      graph,
+      nodeSizes: {
+        source: { width: 80, height: 40 },
+        target: { width: 80, height: 40 },
+      },
+      profile: {
+        type: "fixed",
+        positions: { source: { x: 0, y: 0 }, target: { x: 320, y: 0 } },
+      },
+      edgeRouteConstraints: {
+        route: { type: "orthogonal-corridor", axis: "y", coordinate: 120 },
+      },
+    });
+
+    expect(plan.edges[0]?.route).toMatchObject({
+      strategy: "constrained",
+      source: { x: 80, y: 20 },
+      target: { x: 320, y: 20 },
+      points: [
+        { x: 80, y: 20 },
+        { x: 110, y: 20 },
+        { x: 110, y: 120 },
+        { x: 290, y: 120 },
+        { x: 290, y: 20 },
+        { x: 320, y: 20 },
+      ],
+    });
+    expect(plan.edges[0]?.path).toContain("120");
+    expect(plan.bounds).toEqual({ x: 0, y: 0, width: 400, height: 120 });
+    expect(plan.quality.nonOrthogonalSegments).toBe(0);
+  });
+
+  it("computes crossing bridges and diagnostics from constrained final routes", () => {
+    const graph: SemanticGraphV1 = {
+      version: 1,
+      nodes: [
+        { id: "left" }, { id: "right" }, { id: "top" }, { id: "bottom" },
+        { id: "blocker" },
+      ],
+      relations: [
+        { id: "horizontal", source: "left", target: "right", direction: "directed" },
+        { id: "vertical", source: "top", target: "bottom", direction: "directed" },
+      ],
+    };
+    const plan = compileGraphView({
+      graph,
+      nodeSizes: Object.fromEntries(graph.nodes.map((node) => [
+        node.id,
+        node.id === "blocker" ? { width: 60, height: 40 } : { width: 80, height: 40 },
+      ])),
+      profile: {
+        type: "fixed",
+        positions: {
+          left: { x: -200, y: 0 }, right: { x: 200, y: 0 },
+          top: { x: 0, y: -200 }, bottom: { x: 0, y: 200 },
+          blocker: { x: 70, y: 40 },
+        },
+      },
+      edgeRouteConstraints: {
+        horizontal: { type: "orthogonal-corridor", axis: "y", coordinate: 60 },
+      },
+    });
+
+    const horizontal = plan.edges.find((edge) => edge.id === "horizontal");
+    expect(horizontal?.route.jumps).toEqual([
+      expect.objectContaining({ x: 40, y: 60 }),
+    ]);
+    expect(plan.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "edge_node_intersection",
+        viewIds: ["blocker", "horizontal"],
+      }),
+      expect.objectContaining({
+        code: "edge_crossing",
+        viewIds: ["horizontal", "vertical"],
+      }),
+    ]));
+  });
+
+  it("validates route constraints and ignores a valid constraint when its source edge is filtered out", () => {
+    expect(() => compileGraphView({
+      graph: chain,
+      nodeSizes: sizes,
+      profile: { type: "layered", layout: { direction: "left-to-right" } },
+      edgeRouteConstraints: {
+        ab: { type: "orthogonal-corridor", axis: "x", coordinate: 100 },
+      },
+    })).toThrow(expect.objectContaining({
+      issues: [expect.objectContaining({
+        code: "invalid_edge_route_constraint",
+        id: "edgeRouteConstraints",
+      })],
+    }));
+    expect(() => compileGraphView({
+      graph: chain,
+      nodeSizes: sizes,
+      profile: { type: "fixed", positions: { a: { x: 0, y: 0 }, b: { x: 200, y: 0 }, c: { x: 400, y: 0 } } },
+      edgeRouteConstraints: {
+        missing: { type: "orthogonal-corridor", axis: "x", coordinate: 100 },
+      },
+    })).toThrow(expect.objectContaining({
+      issues: [expect.objectContaining({ code: "unknown_edge_route_constraint", id: "missing" })],
+    }));
+    expect(() => compileGraphView({
+      graph: chain,
+      nodeSizes: sizes,
+      profile: { type: "fixed", positions: { a: { x: 0, y: 0 }, b: { x: 200, y: 0 }, c: { x: 400, y: 0 } } },
+      edgeRouteConstraints: {
+        ab: { type: "orthogonal-corridor", axis: "x", coordinate: Number.NaN },
+      },
+    })).toThrow(expect.objectContaining({
+      issues: [expect.objectContaining({ code: "invalid_edge_route_constraint", id: "ab" })],
+    }));
+    const filtered = compileGraphView({
+      graph: chain,
+      passes: [{ id: "only-bc", type: "filter", filter: { nodeIds: ["b", "c"] } }],
+      nodeSizes: sizes,
+      profile: { type: "fixed", positions: { b: { x: 200, y: 0 }, c: { x: 400, y: 0 } } },
+      edgeRouteConstraints: {
+        ab: { type: "orthogonal-corridor", axis: "y", coordinate: 100 },
+      },
+    });
+    expect(filtered.edges.map((edge) => edge.id)).toEqual(["bc"]);
+  });
+
   it("normalizes shuffled source input into the same deterministic plan", () => {
     const input: Omit<CompileGraphViewInput, "graph"> = {
       nodeSizes: sizes,

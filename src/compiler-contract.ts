@@ -4,6 +4,7 @@ import type {
 } from "./project.js";
 import type {
   LayeredLayoutOptions,
+  EdgeRouteConstraints,
   NodeBox,
   Point,
   ProjectionIssue,
@@ -70,6 +71,8 @@ export interface CompileGraphViewInput {
   edgeWeights?: Readonly<Record<string, number>>;
   profile: GraphViewProfile;
   routing?: ProjectionRoutingOptions;
+  /** Product-authored per-edge geometry constraints, keyed by source relation id. */
+  edgeRouteConstraints?: EdgeRouteConstraints;
   previousPlan?: GraphViewPlanV1;
   stability?: GraphViewStability;
 }
@@ -82,6 +85,8 @@ export interface GraphViewCompileIssue {
     | "too_many_passes"
     | "invalid_profile"
     | "invalid_routing_option"
+    | "invalid_edge_route_constraint"
+    | "unknown_edge_route_constraint"
     | "missing_label_size"
     | "invalid_label_size"
     | "invalid_previous_plan"

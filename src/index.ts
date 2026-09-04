@@ -18,6 +18,7 @@ export {
   validateSemanticGraph,
 } from "./semantic-graph.js";
 export {
+  applyOrthogonalRouteConstraint,
   allocateRectanglePorts,
   choosePorts,
   compactOrthogonalPoints,
