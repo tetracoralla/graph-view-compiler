@@ -11,6 +11,8 @@ to compound layout, arbitrary backends, or shared 3D.
 
 Read `docs/NORTH_STAR.md` when planning product expansion and
 `docs/PRODUCT_MODEL.md` when stating what the current release actually owns.
+For a requested review or an affected integration boundary, consult
+`docs/REVIEW_CONTRACT.md`; use its risk map within the requested scope.
 
 ## Product invariants
 

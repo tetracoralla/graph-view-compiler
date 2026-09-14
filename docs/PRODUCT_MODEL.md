@@ -1,6 +1,6 @@
 # Product model
 
-Status: current implemented 0.5 boundary. The owner-confirmed target is defined
+Status: current implemented 0.5 boundary. The product target is defined
 in the [North star](NORTH_STAR.md); target capabilities are not current-release
 claims.
 
@@ -56,8 +56,9 @@ trace, or business approval.
 
 ## Distribution
 
-The source repository and npm tarball are independent release units. Before
-registry publication, consumer repositories vendor one exact tarball and its
+The source repository and npm tarball are independent release units. For
+unreleased candidate validation, consumer repositories can vendor one exact
+tarball and its
 SHA-256 sidecar so standalone checkouts do not depend on a sibling directory.
 Published consumers pin a registry version. Browser, desktop, and plugin builds
 bundle the runtime code, so external product users do not need Node.js or a

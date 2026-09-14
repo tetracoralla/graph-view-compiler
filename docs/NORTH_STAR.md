@@ -1,6 +1,6 @@
 # North star: a renderer-neutral graph view compiler
 
-Status: owner-confirmed product definition. The current 0.5 package implements
+Status: product definition. The current 0.5 package implements
 the stable narrow waist described here for layered and caller-positioned 2D
 views. The public product identity is `Graph View Compiler`; the npm package is
 `@openadam/graph-view-compiler`.
@@ -150,7 +150,7 @@ The product has reached a defensible end state when:
 5. adding a backend or product adapter does not change the semantic contract or
    require consumers to adopt another product's renderer.
 
-## Current 0.5 closure
+## Current 0.5 support
 
 The current package implements the semantic graph, bounded core operations,
 ordered compiler contract, layered and fixed-position profiles, shared routing,
@@ -164,5 +164,5 @@ without adopting a shared renderer.
 This closes the current compile boundary; it does not freeze the product. A new
 layout backend, expanded compound-group placement, or 3D projection belongs only
 after a current consumer and comparative fixture demonstrate that it serves the
-same job better without changing semantic meaning. Registry publication remains
-a separate release decision, not missing compiler work.
+same job better without changing semantic meaning. See [Releasing](RELEASING.md)
+for the publication workflow.

@@ -34,7 +34,7 @@ See [engine selection](docs/ENGINE_SELECTION.md) for the Dagre/ELK.js/
 Graphviz/libavoid boundary and why this package is not an Agent replacement for
 traditional graph libraries.
 
-The owner-confirmed product is a renderer-neutral
+The library is a renderer-neutral
 [graph view compiler](docs/NORTH_STAR.md). The current 0.5 source API implements its
 stable narrow waist for layered and caller-positioned 2D views; the document
 also defines explicit non-goals and the conditions for future expansion. The
@@ -105,7 +105,7 @@ For unreleased release-candidate validation, Calligram, Laniakea, and Dependency
 Engine can temporarily consume the exact packed tarball. Refresh all three with:
 
 ```sh
-npm run sync:consumers -- ../visual-document ../laniakea ../graph-dependency-solver
+npm run sync:consumers -- ./path/to/calligram ./path/to/laniakea ./path/to/dependency-engine
 ```
 
 The release workflow publishes through npm trusted publishing and receives npm
