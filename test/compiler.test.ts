@@ -446,6 +446,55 @@ describe("graph view compiler", () => {
     expect(plan.edges[0]?.label).toMatchObject({ text: "needs", width: 48, height: 18 });
   });
 
+  it("keeps a labelled branch, parallel route, back edge, and self loop visually clear", () => {
+    const graph: SemanticGraphV1 = {
+      version: 1,
+      nodes: ["start", "upper", "lower", "finish"].map((id) => ({
+        id,
+        ports: [
+          { id: "input", preferredSide: "left" as const },
+          { id: "output", preferredSide: "right" as const },
+        ],
+      })),
+      relations: [
+        { id: "start-upper", source: "start", target: "upper", direction: "directed", label: "Covered", sourcePort: "output", targetPort: "input" },
+        { id: "start-upper-alternative", source: "start", target: "upper", direction: "directed", label: "Alternative topic route", sourcePort: "output", targetPort: "input" },
+        { id: "start-lower", source: "start", target: "lower", direction: "directed", label: "Needs clarification", sourcePort: "output", targetPort: "input" },
+        { id: "upper-finish", source: "upper", target: "finish", direction: "directed", label: "Always", sourcePort: "output", targetPort: "input" },
+        { id: "lower-finish", source: "lower", target: "finish", direction: "directed", label: "Always", sourcePort: "output", targetPort: "input" },
+        { id: "finish-rework", source: "finish", target: "start", direction: "directed", label: "Rework", sourcePort: "output", targetPort: "input" },
+        { id: "finish-retry", source: "finish", target: "finish", direction: "directed", label: "Retry locally", sourcePort: "output", targetPort: "input" },
+      ],
+    };
+    const plan = compileGraphView({
+      graph,
+      nodeSizes: Object.fromEntries(graph.nodes.map((node) => [node.id, { width: 226, height: 132 }])),
+      labelSizes: Object.fromEntries(graph.relations.map((relation) => [relation.id, {
+        width: Math.min(184, Math.max(52, 18 + (relation.label?.length ?? 0) * 6.4)),
+        height: 24,
+      }])),
+      profile: {
+        type: "layered",
+        layout: { direction: "left-to-right", nodeGap: 72, edgeGap: 28, rankGap: 216, marginX: 110, marginY: 96 },
+      },
+      routing: { stub: 24, clearance: 14, turnCost: 18, maximumObstacles: 96 },
+    });
+    expect(plan.quality).toEqual({
+      complete: true,
+      edgeCrossings: 0,
+      edgeNodeIntersections: 0,
+      nonOrthogonalSegments: 0,
+      duplicateEndpointPairs: 0,
+      nodeOverlaps: 0,
+      labelNodeOverlaps: 0,
+      labelEdgeIntersections: 0,
+      labelOverlaps: 0,
+    });
+    expect(plan.diagnostics).toEqual([]);
+    expect(plan.edges.find((edge) => edge.id === "finish-rework")?.route.strategy).toBe("obstacle-avoiding");
+    expect(plan.edges.find((edge) => edge.id === "finish-retry")?.route.strategy).toBe("obstacle-avoiding");
+  });
+
   it("reports node and measured-label collisions with affected source objects", () => {
     const graph: SemanticGraphV1 = {
       version: 1,

@@ -1,0 +1,31 @@
+{
+  "schema": "openadam.release-profile",
+  "version": "0.1",
+  "distribution": {
+    "source": "public",
+    "audience": "public"
+  },
+  "carriers": [
+    {
+      "id": "npm-package",
+      "required": true,
+      "packages": ["package.json"]
+    },
+    {
+      "id": "github-release",
+      "required": true
+    },
+    {
+      "id": "github-actions",
+      "required": true,
+      "workflows": ["ci.yml", "codeql.yml", "release.yml"]
+    }
+  ],
+  "intentionalAbsences": [
+    {
+      "carrier": "hosted-deployment",
+      "reason": "The release workflow publishes the npm library; the product has no hosted application or documentation deployment.",
+      "reviewWhen": "A browser-hosted product surface or documentation deployment is intentionally added."
+    }
+  ]
+}

@@ -385,6 +385,37 @@ describe("ports and routing", () => {
     }]).edgeNodeIntersections).toBe(0);
   });
 
+  it("routes self loops and backward edges around their endpoint interiors", () => {
+    const node: NodeBox = { id: "loop", x: 100, y: 80, width: 180, height: 90 };
+    const selfLoop = routeOrthogonal(node, node, {
+      sourcePort: "right",
+      targetPort: "left",
+      obstacles: [node],
+    });
+    expect(selfLoop.strategy).toBe("obstacle-avoiding");
+    expect(inspectRoutedGraph([node], [{
+      id: "self-loop",
+      sourceId: node.id,
+      targetId: node.id,
+      route: selfLoop,
+    }]).edgeNodeIntersections).toBe(0);
+
+    const earlier: NodeBox = { id: "earlier", x: 0, y: 100, width: 160, height: 70 };
+    const later: NodeBox = { id: "later", x: 560, y: 100, width: 160, height: 70 };
+    const backward = routeOrthogonal(later, earlier, {
+      sourcePort: "right",
+      targetPort: "left",
+      obstacles: [earlier, later],
+    });
+    expect(backward.strategy).toBe("obstacle-avoiding");
+    expect(inspectRoutedGraph([earlier, later], [{
+      id: "backward",
+      sourceId: later.id,
+      targetId: earlier.id,
+      route: backward,
+    }]).edgeNodeIntersections).toBe(0);
+  });
+
   it("allocates distinct ports for several relations on one side", () => {
     const nodes = [
       left,

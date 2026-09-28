@@ -47,7 +47,7 @@ rerunnable package, cold-import, determinism, and compile-time measurement.
 ## Install
 
 ```sh
-npm install @openadam/graph-view-compiler@0.5.0
+npm install @openadam/graph-view-compiler@0.5.1
 ```
 
 ## Quick start
@@ -96,7 +96,7 @@ Applications should pin an exact compatible registry version:
 ```json
 {
   "dependencies": {
-      "@openadam/graph-view-compiler": "0.5.0"
+      "@openadam/graph-view-compiler": "0.5.1"
   }
 }
 ```

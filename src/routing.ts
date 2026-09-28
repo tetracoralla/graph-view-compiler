@@ -9,6 +9,7 @@ import type {
   RoutedEdge,
 } from "./types.js";
 import { compareGraphIds } from "./semantic-graph.js";
+import { segmentIntersectsNode } from "./quality.js";
 
 const EPSILON = 0.01;
 
@@ -208,10 +209,15 @@ export function compactOrthogonalPoints(points: readonly Point[]): Point[] {
     if (index === 0 || index === distinct.length - 1) return true;
     const previous = distinct[index - 1]!;
     const next = distinct[index + 1]!;
+    // Preserve a collinear turnaround: its extremum is the only thing keeping
+    // a wrap route outside an endpoint node. Only remove a point when the two
+    // adjacent segments continue in the same direction.
     const vertical = Math.abs(previous.x - point.x) < EPSILON &&
-      Math.abs(point.x - next.x) < EPSILON;
+      Math.abs(point.x - next.x) < EPSILON &&
+      (point.y - previous.y) * (next.y - point.y) >= 0;
     const horizontal = Math.abs(previous.y - point.y) < EPSILON &&
-      Math.abs(point.y - next.y) < EPSILON;
+      Math.abs(point.y - next.y) < EPSILON &&
+      (point.x - previous.x) * (next.x - point.x) >= 0;
     return !vertical && !horizontal;
   });
 }
@@ -714,6 +720,20 @@ function simpleRouteIsClear(
   );
 }
 
+function routeReentersEndpoint(
+  points: readonly Point[],
+  sourceNode: NodeBox,
+  targetNode: NodeBox,
+): boolean {
+  return points.slice(1).some((point, index) => {
+    const previous = points[index]!;
+    const firstSegment = index === 0;
+    const lastSegment = index === points.length - 2;
+    return (!firstSegment && segmentIntersectsNode(previous, point, sourceNode)) ||
+      (!lastSegment && segmentIntersectsNode(previous, point, targetNode));
+  });
+}
+
 export function routeOrthogonal(
   sourceNode: NodeBox,
   targetNode: NodeBox,
@@ -811,6 +831,7 @@ function attemptOrthogonalRoute(
     : obstacleNodes;
   const expanded = expandObstacles(selected, clearance);
   const simplePoints = simpleOrthogonalPoints(source, target, source.side, target.side, stub);
+  const reentersEndpoint = routeReentersEndpoint(simplePoints, sourceNode, targetNode);
   const resolvedStub = facingStubDistance(
     source,
     target,
@@ -820,7 +841,7 @@ function attemptOrthogonalRoute(
   );
   // An empty selection only means "clear" when there was nothing to avoid;
   // an exhausted budget is degradation, not clearance.
-  const clear = selected.length === 0
+  const clearsUnrelated = selected.length === 0
     ? obstacleNodes.length === 0
     : simpleRouteIsClear(
         simplePoints,
@@ -828,23 +849,28 @@ function attemptOrthogonalRoute(
         pointOutside(target, target.side, resolvedStub),
         expanded,
       );
-  const avoiding = selected.length > 0 && !clear
+  const clear = clearsUnrelated && !reentersEndpoint;
+  const endpointObstacles = sourceNode.id === targetNode.id
+    ? [sourceNode]
+    : [sourceNode, targetNode];
+  const canSearch = selected.length > 0 || obstacleNodes.length === 0 || reentersEndpoint;
+  const avoiding = !clear && canSearch
     ? obstacleAvoidingPoints(
         source,
         target,
         source.side,
         target.side,
-        selected,
+        [...selected, ...endpointObstacles],
         stub,
         clearance,
         turnCost,
-        maximumObstacles,
+        maximumObstacles + endpointObstacles.length,
       )
     : undefined;
   const points = avoiding ?? simplePoints;
-  const fallbackReason = obstacleNodes.length === 0 || clear
+  const fallbackReason = clear
     ? undefined
-    : avoiding === undefined && selected.length === 0
+    : maximumObstacles === 0 && obstacleNodes.length > 0
       ? "obstacle-limit"
       : avoiding === undefined
         ? "no-corridor"

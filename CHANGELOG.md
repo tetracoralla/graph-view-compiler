@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.1 - 2026-09-28
+
+- Keep self-loops, reverse edges, and close endpoint turns outside both endpoint
+  rectangles while preserving exact declared boundary ports.
+- Include endpoint rectangles in obstacle-aware routing so a route cannot leave
+  one side and re-enter the same node before continuing to its destination.
+- Select label anchors against node, edge, and existing-label geometry instead
+  of accepting the first candidate, removing avoidable overlaps in dense mixed
+  forward, parallel, reverse, and self-loop views.
+- Add a composed quality regression that requires zero node, edge, and label
+  collisions for the Procedure Studio graph shape that exposed the defects.
+
 ## 0.5.0 - 2026-09-04
 
 - Add finite per-relation `orthogonal-corridor` constraints for fixed-position

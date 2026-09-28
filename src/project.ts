@@ -8,6 +8,7 @@ import {
   routeCrossings,
   routeOrthogonalBetweenPortsWithRetries,
 } from "./routing.js";
+import { segmentIntersectsNode } from "./quality.js";
 import {
   GraphProjectionError,
   assertProjectionGraph,
@@ -27,6 +28,7 @@ import type {
 } from "./types.js";
 import { MAX_GRAPH_VIEW_ROUTE_CROSSINGS_WORK } from "./types.js";
 import type { OrthogonalRouteGeometryOptions } from "./routing.js";
+import { compareGraphIds } from "./semantic-graph.js";
 
 export interface ProjectedEdge {
   id: string;
@@ -117,6 +119,92 @@ function sanitizedRouting(options: ProjectionRoutingOptions): ProjectionRoutingO
 
 function routeMidpoint(route: OrthogonalRoute): { x: number; y: number } {
   return pointOnRoute(route, 0.5);
+}
+
+interface LabelBox extends Point {
+  width: number;
+  height: number;
+}
+
+function boxesOverlap(left: LabelBox, right: LabelBox, gap = 0): boolean {
+  return left.x - left.width / 2 - gap < right.x + right.width / 2 &&
+    left.x + left.width / 2 + gap > right.x - right.width / 2 &&
+    left.y - left.height / 2 - gap < right.y + right.height / 2 &&
+    left.y + left.height / 2 + gap > right.y - right.height / 2;
+}
+
+function labelIntersectsNode(label: LabelBox, node: NodeBox): boolean {
+  return boxesOverlap(label, {
+    x: node.x + node.width / 2,
+    y: node.y + node.height / 2,
+    width: node.width,
+    height: node.height,
+  }, 4);
+}
+
+function edgeIntersectsLabel(edge: ProjectedEdge, label: LabelBox): boolean {
+  const box = {
+    id: edge.id,
+    x: label.x - label.width / 2,
+    y: label.y - label.height / 2,
+    width: label.width,
+    height: label.height,
+  };
+  return edge.route.points.slice(1).some((point, index) =>
+    segmentIntersectsNode(edge.route.points[index]!, point, box),
+  );
+}
+
+function labelCandidates(route: OrthogonalRoute): Point[] {
+  const candidates = [0.5, 0.34, 0.66, 0.25, 0.75, 0.2, 0.8].map((fraction) =>
+    pointOnRoute(route, fraction),
+  );
+  const segmentMidpoints = route.points.slice(1).map((point, index) => {
+    const previous = route.points[index]!;
+    return {
+      point: { x: (previous.x + point.x) / 2, y: (previous.y + point.y) / 2 },
+      length: Math.abs(previous.x - point.x) + Math.abs(previous.y - point.y),
+      index,
+    };
+  }).sort((left, right) => right.length - left.length || left.index - right.index);
+  for (const segment of segmentMidpoints) candidates.push(segment.point);
+  return candidates.filter((candidate, index) => candidates.findIndex((other) =>
+    Math.abs(other.x - candidate.x) < 0.01 && Math.abs(other.y - candidate.y) < 0.01,
+  ) === index);
+}
+
+function placeRouteLabels(
+  nodes: readonly NodeBox[],
+  edges: readonly ProjectedEdge[],
+): ProjectedEdge[] {
+  const labels = edges.filter((edge) => edge.label !== undefined).sort((left, right) => {
+    const areaDelta = right.label!.width * right.label!.height -
+      left.label!.width * left.label!.height;
+    return areaDelta !== 0 ? areaDelta : compareGraphIds(left.id, right.id);
+  });
+  const placed = new Map<string, LabelBox>();
+  for (const edge of labels) {
+    const measured = edge.label!;
+    const candidates = labelCandidates(edge.route);
+    let best: { box: LabelBox; score: number } | undefined;
+    candidates.forEach((point, index) => {
+      const box = { ...point, width: measured.width, height: measured.height };
+      const nodeHits = nodes.filter((node) => labelIntersectsNode(box, node)).length;
+      const labelHits = [...placed.values()].filter((other) => boxesOverlap(box, other, 6)).length;
+      const edgeHits = edges.filter((other) => other.id !== edge.id && edgeIntersectsLabel(other, box)).length;
+      const score = nodeHits * 1_000_000_000 + labelHits * 1_000_000 +
+        edgeHits * 1_000 + index;
+      if (best === undefined || score < best.score) best = { box, score };
+    });
+    placed.set(edge.id, best?.box ?? {
+      ...routeMidpoint(edge.route),
+      width: measured.width,
+      height: measured.height,
+    });
+  }
+  return edges.map((edge) => edge.label === undefined
+    ? edge
+    : { ...edge, label: { ...edge.label, ...placed.get(edge.id)! } });
 }
 
 function extent(values: readonly number[]): number {
@@ -217,8 +305,9 @@ function projectPositionedGraph(
           }),
     }];
   });
-  const jumpsById = boundedRouteCrossingJumps(routed);
-  const edges = routed.map((edge) => {
+  const labeled = placeRouteLabels(nodes, routed);
+  const jumpsById = boundedRouteCrossingJumps(labeled);
+  const edges = labeled.map((edge) => {
     const jumps = jumpsById === undefined
       ? undefined
       : jumpsForRoundedOrthogonalPath(edge.route.points, jumpsById[edge.id] ?? []);
